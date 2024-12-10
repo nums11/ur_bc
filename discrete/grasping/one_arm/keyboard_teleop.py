@@ -51,7 +51,8 @@ def moveArm(action):
  
 
     if action in list(range(12)):
-        robot.movejInvKin(pose)
+        # robot.movejInvKin(pose)
+        robot.servojInvKin(pose)
 
 def on_press(key):
     if not hasattr(key, 'char'):
