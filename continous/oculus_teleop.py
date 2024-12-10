@@ -12,7 +12,7 @@ from robotiq_modbus_controller.driver import RobotiqModbusRtuDriver
 def getControllerPositionAndTrigger(oculus):
     transformations, buttons = oculus.get_transformations_and_buttons()
     pos = transformations['r'][:, 3]
-    return (pos[:3], buttons['RTr'])
+    return (pos[:3], buttons['RG'], buttons['RTr'])
 
 """ Get the EE delta of the UR from the oculus delta """
 def getEEDelta(controller_pos, new_controller_pos):
@@ -76,33 +76,40 @@ status = gripper.status()
 print("Gripper status", status)
 
 """ Get Initial Controller Position and Robot Pose """
-controller_pos, _ = getControllerPositionAndTrigger(oculus)
+controller_pos, _, _ = getControllerPositionAndTrigger(oculus)
 robot_pose = robot.get_pose_array()
 print("Initial controller position", controller_pos)
 print("Initial robot pose", robot_pose)
 
+prev_right_gripper = False
 while True:
     # print(transformations, buttons)
-    new_controller_pos, right_trigger = getControllerPositionAndTrigger(oculus)
-    ee_delta = getEEDelta(controller_pos, new_controller_pos)
-    if deltaMeetsThreshold(ee_delta):
-        robot_pos = robot_pose[:3]
-        new_robot_pos = robot_pos + ee_delta
-        new_robot_pose = [new_robot_pos[0], new_robot_pos[1], new_robot_pos[2], robot_pose[3], robot_pose[4], robot_pose[5]]
-        # robot.servojInvKin(new_robot_pose)
-        updateRobotPose(ur_modbus_client, new_robot_pose)
-        print("Moved robot to pose", new_robot_pose)
+    new_controller_pos, right_gripper, right_trigger = getControllerPositionAndTrigger(oculus)
+    if right_gripper:
+        if not prev_right_gripper:
+            # Update current controller position to be new controller position on new gripper press
+            controller_pos = new_controller_pos
+        else:
+            ee_delta = getEEDelta(controller_pos, new_controller_pos)
+            if deltaMeetsThreshold(ee_delta):
+                robot_pos = robot_pose[:3]
+                new_robot_pos = robot_pos + ee_delta
+                new_robot_pose = [new_robot_pos[0], new_robot_pos[1], new_robot_pos[2], robot_pose[3], robot_pose[4], robot_pose[5]]
+                updateRobotPose(ur_modbus_client, new_robot_pose)
+                print("Moved robot to pose", new_robot_pose)
 
-        controller_pos = new_controller_pos
-        robot_pose = new_robot_pose
-    else:
-        print("delta did not meet threshold", ee_delta)
+                controller_pos = new_controller_pos
+                robot_pose = new_robot_pose
+            else:
+                print("delta did not meet threshold", ee_delta)
 
-    if right_trigger:
-        moveGripper(gripper, close=True)
-        print("Right trigger pressed")
+        if right_trigger:
+            moveGripper(gripper, close=True)
+        else:
+            moveGripper(gripper, close=False)
+
+        prev_right_gripper = True
     else:
-        moveGripper(gripper, close=False)
-        print("Right trigger NOT pressed")
+        prev_right_gripper = False
 
     sleep(0.005)
