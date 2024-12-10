@@ -6,12 +6,13 @@ import pymodbus.client as ModbusClient
 from pymodbus.framer import Framer
 from pymodbus.payload import BinaryPayloadBuilder
 from pymodbus.constants import Endian
+from robotiq_modbus_controller.driver import RobotiqModbusRtuDriver
 
 """ Get Cartesian Position of the Oculus """
-def getControllerPosition(oculus):
+def getControllerPositionAndTrigger(oculus):
     transformations, buttons = oculus.get_transformations_and_buttons()
     pos = transformations['r'][:, 3]
-    return pos[:3]
+    return (pos[:3], buttons['RTr'])
 
 """ Get the EE delta of the UR from the oculus delta """
 def getEEDelta(controller_pos, new_controller_pos):
@@ -33,6 +34,15 @@ def updateRobotPose(client, position):
 def deltaMeetsThreshold(delta):
     threshold = 1e-2
     return abs(delta[0]) > threshold or abs(delta[1]) > threshold or abs(delta[2]) > threshold
+
+def moveGripper(gripper, close=True):
+    gripper_speed = 4
+    gripper_force = 1
+    gripper_pos = 0
+    if close:
+        gripper_pos = 200
+    gripper.move(pos=gripper_pos, speed=gripper_speed, force=gripper_force)
+
 
 """ Initialize Oculus """
 oculus = OculusReader()
@@ -57,15 +67,23 @@ robot.movej(start_joint__positions)
 print("Robot reset to start position ------")
 sleep(1)
 
+"""Initialize Gripper"""
+gripper_port = "/dev/ttyUSB0"
+gripper = RobotiqModbusRtuDriver(gripper_port)
+gripper.connect()
+gripper.activate()
+status = gripper.status()
+print("Gripper status", status)
+
 """ Get Initial Controller Position and Robot Pose """
-controller_pos = getControllerPosition(oculus)
+controller_pos, _ = getControllerPositionAndTrigger(oculus)
 robot_pose = robot.get_pose_array()
 print("Initial controller position", controller_pos)
 print("Initial robot pose", robot_pose)
 
 while True:
     # print(transformations, buttons)
-    new_controller_pos = getControllerPosition(oculus)
+    new_controller_pos, right_trigger = getControllerPositionAndTrigger(oculus)
     ee_delta = getEEDelta(controller_pos, new_controller_pos)
     if deltaMeetsThreshold(ee_delta):
         robot_pos = robot_pose[:3]
@@ -79,4 +97,12 @@ while True:
         robot_pose = new_robot_pose
     else:
         print("delta did not meet threshold", ee_delta)
+
+    if right_trigger:
+        moveGripper(gripper, close=True)
+        print("Right trigger pressed")
+    else:
+        moveGripper(gripper, close=False)
+        print("Right trigger NOT pressed")
+
     sleep(0.005)
