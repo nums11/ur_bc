@@ -8,42 +8,19 @@ from pymodbus.payload import BinaryPayloadBuilder
 from pymodbus.constants import Endian
 from robotiq_modbus_controller.driver import RobotiqModbusRtuDriver
 import m3d
-
-# def get_roll_pitch_yaw_from_matrix(matrix):
-#     """
-#     Extract roll, pitch, and yaw from a 3x3 or 4x4 transformation matrix using the ZYX convention.
-
-#     Parameters:
-#         matrix (numpy.ndarray): A 3x3 or 4x4 transformation matrix.
-
-#     Returns:
-#         tuple: (roll, pitch, yaw) in radians.
-#     """
-#     if matrix.shape == (4, 4):
-#         # Extract the rotation part from the 4x4 matrix
-#         matrix = matrix[:3, :3]
-
-#     if matrix.shape != (3, 3):
-#         raise ValueError("Input must be a 3x3 or 4x4 transformation matrix.")
-
-#     # Check for gimbal lock (singularities)
-#     if np.isclose(matrix[2, 0], 1.0):
-#         # Gimbal lock, positive singularity
-#         pitch = np.pi / 2
-#         roll = 0
-#         yaw = np.arctan2(matrix[0, 1], matrix[0, 2])
-#     elif np.isclose(matrix[2, 0], -1.0):
-#         # Gimbal lock, negative singularity
-#         pitch = -np.pi / 2
-#         roll = 0
-#         yaw = np.arctan2(-matrix[0, 1], -matrix[0, 2])
-#     else:
-#         # General case
-#         pitch = np.arcsin(-matrix[2, 0])
-#         roll = np.arctan2(matrix[2, 1], matrix[2, 2])
-#         yaw = np.arctan2(matrix[1, 0], matrix[0, 0])
-
-#     return roll, pitch, yaw
+import threading
+# IK Fast stuff
+# import ikfastpy
+# Initialize kinematics for UR5 robot arm
+# ur5_kin = ikfastpy.PyKinematics()
+# n_joints = ur5_kin.getDOF()
+# Cacl IK fast
+# temp_pose = np.append(new_robot_pose, 1)
+# joint_solutions = ur5_kin.inverse(temp_pose.tolist())
+# n_solutions = int(len(joint_solutions)/n_joints)    
+# print("N solutions", n_solutions)
+# target_joints = joint_solutions[:6]
+# print("Taking first solution", target_joints)
 
 def get_roll_pitch_yaw_from_matrix(matrix):
     # Extract the rotation part from the matrix
@@ -76,10 +53,17 @@ def get6dPoseFromMatrix(matrix):
     return np.array([x, y, z, roll, pitch, yaw])
 
 """ Get Oculus pose with RTr and RG gripper values """
-def getControllerPoseAndTrigger(oculus):
+def getControllerPoseAndTrigger(oculus, is_right_arm):
     transformations, buttons = oculus.get_transformations_and_buttons()
-    pose = get6dPoseFromMatrix(transformations['r'])
-    return pose, buttons['RG'], buttons['RTr']
+    transformation_key = 'r'
+    gripper_key = 'RG'
+    trigger_key = 'RTr'
+    if not is_right_arm:
+        transformation_key = 'l'
+        gripper_key = 'LG'
+        trigger_key = 'LTr'
+    pose = get6dPoseFromMatrix(transformations[transformation_key])
+    return pose, buttons[gripper_key], buttons[trigger_key]
 
 """ Get the EE delta of the UR from the oculus delta """
 def getEEDelta(controller_pose, new_controller_pose):
@@ -87,10 +71,11 @@ def getEEDelta(controller_pose, new_controller_pose):
     # Move controller axes to correspond with the UR
     ee_delta = np.array([ee_delta[2], ee_delta[0], ee_delta[1],
                         ee_delta[5], ee_delta[4], -1 * ee_delta[3]])
+    # ee_delta = np.array([0,0,0, 0, 0, 0])
     return ee_delta
 
 """ Updates the robot position via modbus """
-def updateRobotPose(client, target_pose, wrist_position):
+def updateRobotPose(client, target_pose):
     target_pose = np.array(target_pose) * 100
     builder = BinaryPayloadBuilder(byteorder=Endian.BIG, wordorder=Endian.BIG)
     for i in range(6):
@@ -98,19 +83,11 @@ def updateRobotPose(client, target_pose, wrist_position):
         builder.add_16bit_int(int(target_pose[i]))
         payload = builder.to_registers()
         client.write_register(128 + i, payload[0])
-    wrist_position *= 100
-    builder.add_16bit_int(int(wrist_position))
-    payload = builder.to_registers()
-    client.write_register(134, payload[0])
-
-def updateRobotJoints(client, joint_positions):
-    joint_positions = np.array(joint_positions) * 100
-    builder = BinaryPayloadBuilder(byteorder=Endian.BIG, wordorder=Endian.BIG)
-    for i in range(6):
-        builder.reset()
-        builder.add_16bit_int(int(joint_positions[i]))
-        payload = builder.to_registers()
-        client.write_register(128 + i, payload[0])
+    # print("Writing wrist position", wrist_position)
+    # wrist_position *= 100
+    # builder.add_16bit_int(int(wrist_position))
+    # payload = builder.to_registers()
+    # client.write_register(134, payload[0])
 
 """ Returns True if a position delta is greater than some threshold across any axis """
 def deltaMeetsThreshold(delta):
@@ -157,23 +134,35 @@ def moveGripper(gripper, close=True):
 oculus = OculusReader()
 print("Initialized Oculus -------")
 
-""" Initialize UR """
-robot_ip = "192.168.2.2"
-robot = urx.Robot(robot_ip)
-print("Initialized URX Robot -----")
-ur_modbus_client = ModbusClient.ModbusTcpClient(
-    robot_ip,
+""" Initialize UR Arms """
+right_arm_ip = "192.168.2.2"
+left_arm_ip = "192.168.1.2"
+right_arm = urx.Robot(right_arm_ip)
+left_arm = urx.Robot(left_arm_ip)
+print("Initialized URX Robots -----")
+right_arm_modbus_client = ModbusClient.ModbusTcpClient(
+    right_arm_ip,
     port=502,
     framer=Framer.SOCKET
 )
-ur_modbus_client.connect()
-print("Initialized Modbus Client")
-print("Setting to start position ----")
-start_joint__positions = tuple([-0.10555254050793472, -2.176040565310071, -2.020456103497305,
+left_arm_modbus_client = ModbusClient.ModbusTcpClient(
+    left_arm_ip,
+    port=502,
+    framer=Framer.SOCKET
+)
+right_arm_modbus_client.connect()
+left_arm_modbus_client.connect()
+print("Initialized Modbus Clients")
+right_arm_start_joint__positions = tuple([-0.10555254050793472, -2.176040565310071, -2.020456103497305,
                                 0.4152529015018597, -3.4580182915458724, 4.000654384219917])
-robot.movej(start_joint__positions)
-# updateRobotPose(ur_modbus_client, start_joint__positions)
-print("Robot reset to start position ------")
+left_arm_start_joint__positions = tuple([0.10010272221997439, -1.313795512335239, 2.1921907366841067,
+                                         3.7562696849438524, 1.2427944188620925, 0.8873570727182682])
+print("Setting right arm to start position ----")
+right_arm.movej(right_arm_start_joint__positions)
+print("Setting left arm to start position ----")
+left_arm.movej(left_arm_start_joint__positions)
+
+print("Arms reset to start positions ------")
 sleep(1)
 
 """Initialize Gripper"""
@@ -184,62 +173,71 @@ gripper.activate()
 status = gripper.status()
 print("Gripper status", status)
 
-""" Get Initial Controller Position and Robot Pose """
-controller_pose, _, _ = getControllerPoseAndTrigger(oculus)
-robot_pose = robot.get_pose_array()
-print("Initial controller pose", controller_pose)
-print("Initial robot pose", robot_pose, len(robot_pose))
-joint_positions = robot.getj()
-print("Joint positions", joint_positions)
+def arm_control_thread(arm, gripper, modbus_client, is_right_arm):
+    global oculus
+    """ Get Initial Controller Position and Robot Pose """
+    controller_pose, _, _ = getControllerPoseAndTrigger(oculus, is_right_arm)
+    robot_pose = arm.get_pose_array()
+    print("Initial controller pose", controller_pose)
+    print("Initial robot pose", robot_pose, len(robot_pose))
+    joint_positions = arm.getj()
+    print("Joint positions", joint_positions)
 
-right_gripper_pressed_before = False
-while not right_gripper_pressed_before:
-    new_controller_pose, right_gripper, right_trigger = getControllerPoseAndTrigger(oculus)
-    print("Never pressed right gripper ---")
-    updateRobotPose(ur_modbus_client, robot_pose, joint_positions[5])
-    if right_gripper:
-        right_gripper_pressed_before = True
-        print("Breaking")
-        break
 
-prev_right_gripper = False
-while True:
-    new_controller_pose, right_gripper, right_trigger = getControllerPoseAndTrigger(oculus)
-    # Only handle movements when right gripper is pressed
-    if right_gripper:
-        if not prev_right_gripper:
-            # Update current controller position to be new controller position on new gripper press
-            controller_pose = new_controller_pose
-        else:
-            ee_delta = getEEDelta(controller_pose, new_controller_pose)
-            if deltaMeetsThreshold(ee_delta):
-                ee_delta = restrictDelta(ee_delta)
-                # ee_delta = decreaseRotationSensitivies(ee_delta)
-                # Keep the pitch the same and handle wrist rotation separately later
-                wrist_delta = ee_delta[4]
-                ee_delta[4] = 0
-                new_robot_pose = robot_pose + ee_delta
-                print("About to update robot pose. Wrist delta", wrist_delta, "ee_delta", ee_delta[4])
-                # updateRobotPose(ur_modbus_client, new_robot_pose, wrist_delta)
-                # joint_positions[5] += wrist_delta
-                updateRobotPose(ur_modbus_client, new_robot_pose, joint_positions[5])
-                # updateRobotJoints(ur_modbus_client, joint_positions)
-                # Decrease sensitivity of wrist delta
+    gripper_pressed_before = False
+    while not gripper_pressed_before:
+        new_controller_pose, gripper_pressed, _ = getControllerPoseAndTrigger(oculus, is_right_arm)
+        # print("Never pressed gripper ---")
+        updateRobotPose(modbus_client, robot_pose)
+        if gripper_pressed:
+            gripper_pressed_before = True
+            print("Breaking")
+            break
 
-                print("Moved robot to pose", new_robot_pose, "Wrist delta", wrist_delta)
-
+    prev_gripper = False
+    while True:
+        new_controller_pose, gripper_pressed, trigger_pressed = getControllerPoseAndTrigger(oculus, is_right_arm)
+        # Only handle movements when right gripper is pressed
+        if gripper_pressed:
+            if not prev_gripper:
+                # Update current controller position to be new controller position on new gripper press
                 controller_pose = new_controller_pose
-                robot_pose = new_robot_pose
             else:
-                print("delta did not meet threshold", ee_delta)
+                ee_delta = getEEDelta(controller_pose, new_controller_pose)
+                if deltaMeetsThreshold(ee_delta):
+                    ee_delta = restrictDelta(ee_delta)
+                    # ee_delta = decreaseRotationSensitivies(ee_delta)
+                    # Keep the pitch the same and handle wrist rotation separately later
+                    # wrist_1_delta = ee_delta[3]
+                    ee_delta[3] = 0
+                    ee_delta[4] = 0
+                    ee_delta[5] = 0
+                    new_robot_pose = robot_pose + ee_delta
+ 
+                    updateRobotPose(modbus_client, new_robot_pose)
+                    controller_pose = new_controller_pose
+                    robot_pose = new_robot_pose
+                else:
+                    print("delta did not meet threshold", ee_delta)
+                    pass
 
-        if right_trigger:
-            moveGripper(gripper, close=True)
+            if is_right_arm:
+                if trigger_pressed:
+                    print("Moving gripper")
+                    moveGripper(gripper, close=True)
+                else:
+                    moveGripper(gripper, close=False)
+    
+
+            prev_gripper = True
         else:
-            moveGripper(gripper, close=False)
+            prev_gripper = False
 
-        prev_right_gripper = True
-    else:
-        prev_right_gripper = False
+        sleep(0.005)
 
-    sleep(0.005)
+
+right_arm_thread = threading.Thread(target=arm_control_thread, args=(right_arm, gripper, right_arm_modbus_client, True))
+left_arm_thread = threading.Thread(target=arm_control_thread, args=(left_arm, None, left_arm_modbus_client, False))
+right_arm_thread.start()
+left_arm_thread.start()
+
