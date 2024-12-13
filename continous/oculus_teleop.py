@@ -66,8 +66,12 @@ def getControllerPoseAndTrigger(oculus, is_right_arm):
     return pose, buttons[gripper_key], buttons[trigger_key]
 
 """ Get the EE delta of the UR from the oculus delta """
-def getEEDelta(controller_pose, new_controller_pose):
+def getEEDelta(controller_pose, new_controller_pose, is_right_arm):
     ee_delta = new_controller_pose - controller_pose
+    # Flip some axes for left arm
+    if not is_right_arm:
+        ee_delta[0] = -1 * ee_delta[0]
+        ee_delta[2] = -1 * ee_delta[2]
     # Move controller axes to correspond with the UR
     ee_delta = np.array([ee_delta[2], ee_delta[0], ee_delta[1],
                         ee_delta[5], ee_delta[4], -1 * ee_delta[3]])
@@ -203,7 +207,7 @@ def arm_control_thread(arm, gripper, modbus_client, is_right_arm):
                 # Update current controller position to be new controller position on new gripper press
                 controller_pose = new_controller_pose
             else:
-                ee_delta = getEEDelta(controller_pose, new_controller_pose)
+                ee_delta = getEEDelta(controller_pose, new_controller_pose, is_right_arm)
                 if deltaMeetsThreshold(ee_delta):
                     ee_delta = restrictDelta(ee_delta)
                     # ee_delta = decreaseRotationSensitivies(ee_delta)
