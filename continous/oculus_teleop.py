@@ -79,7 +79,7 @@ def getEEDelta(controller_pose, new_controller_pose, is_right_arm):
     return ee_delta
 
 """ Updates the robot position via modbus """
-def updateRobotPose(client, target_pose):
+def updateRobotPose(client, target_pose, wrist_position):
     target_pose = np.array(target_pose) * 100
     builder = BinaryPayloadBuilder(byteorder=Endian.BIG, wordorder=Endian.BIG)
     for i in range(6):
@@ -88,10 +88,10 @@ def updateRobotPose(client, target_pose):
         payload = builder.to_registers()
         client.write_register(128 + i, payload[0])
     # print("Writing wrist position", wrist_position)
-    # wrist_position *= 100
-    # builder.add_16bit_int(int(wrist_position))
-    # payload = builder.to_registers()
-    # client.write_register(134, payload[0])
+    wrist_position *= 100
+    builder.add_16bit_int(int(wrist_position))
+    payload = builder.to_registers()
+    client.write_register(134, payload[0])
 
 """ Returns True if a position delta is greater than some threshold across any axis """
 def deltaMeetsThreshold(delta):
@@ -105,10 +105,15 @@ def deltaMeetsThreshold(delta):
 def restrictDelta(delta):
     delta_restricted = False
     for axis, delta_axis in enumerate(delta):
-        if delta_axis > 0.5:
+        if delta_axis > 0 and delta_axis > 0.5:
             print("----------- RESTRICTED DELTA ---------------------")
             print("Delta  on axis", axis, "was", delta_axis, "setting to 0.05")
             delta[axis] = 0.05
+            delta_restricted = True
+        elif delta_axis < 0 and delta_axis < -0.5:
+            print("----------- RESTRICTED DELTA ---------------------")
+            print("Delta  on axis", axis, "was", delta_axis, "setting to -0.05")
+            delta[axis] = -0.05
             delta_restricted = True
     if delta_restricted:
         print("delta after", delta)
@@ -192,7 +197,7 @@ def arm_control_thread(arm, gripper, modbus_client, is_right_arm):
     while not gripper_pressed_before:
         new_controller_pose, gripper_pressed, _ = getControllerPoseAndTrigger(oculus, is_right_arm)
         # print("Never pressed gripper ---")
-        updateRobotPose(modbus_client, robot_pose)
+        updateRobotPose(modbus_client, robot_pose, joint_positions[4])
         if gripper_pressed:
             gripper_pressed_before = True
             print("Breaking")
@@ -213,16 +218,29 @@ def arm_control_thread(arm, gripper, modbus_client, is_right_arm):
                     # ee_delta = decreaseRotationSensitivies(ee_delta)
                     # Keep the pitch the same and handle wrist rotation separately later
                     # wrist_1_delta = ee_delta[3]
-                    ee_delta[3] = 0
-                    ee_delta[4] = 0
-                    ee_delta[5] = 0
+                    # ee_delta[3] = 0
+                    # ee_delta[4] = 0
+                    # ee_delta[5] = 0
                     new_robot_pose = robot_pose + ee_delta
- 
-                    updateRobotPose(modbus_client, new_robot_pose)
+
+                    # joint_positions = arm.getj()
+                    # # wrist_2_position = joint_positions[4] + ee_delta[4]
+                    # new_wrist_delta = ee_delta[5] * 2
+                    
+                    # print("new_wrist_delta", new_wrist_delta)
+                    # if new_wrist_delta > 0 and new_wrist_delta > 1:
+                    #     print("--- Restricting new wrist delta ---", new_wrist_delta)
+                    #     new_wrist_delta = 0.5
+                    # elif new_wrist_delta < 0 and new_wrist_delta < -1:
+                    #     print("--- Restricting new wrist delta ---", new_wrist_delta)
+                    #     new_wrist_delta = -0.5
+                    # joint_positions[5] += new_wrist_delta
+
+                    updateRobotPose(modbus_client, new_robot_pose, 0)
                     controller_pose = new_controller_pose
                     robot_pose = new_robot_pose
                 else:
-                    print("delta did not meet threshold", ee_delta)
+                    # print("delta did not meet threshold", ee_delta)
                     pass
 
             if is_right_arm:
