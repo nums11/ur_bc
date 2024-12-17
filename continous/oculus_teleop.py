@@ -182,67 +182,53 @@ gripper.activate()
 status = gripper.status()
 print("Gripper status", status)
 
+""" Arm Control """
 def arm_control_thread(arm, gripper, modbus_client, is_right_arm):
     global oculus
-    """ Get Initial Controller Position and Robot Pose """
+    # Get Initial Controller Position and Robot Pose
     controller_pose, _, _ = getControllerPoseAndTrigger(oculus, is_right_arm)
     robot_pose = arm.get_pose_array()
     print("Initial controller pose", controller_pose)
     print("Initial robot pose", robot_pose, len(robot_pose))
     joint_positions = arm.getj()
-    print("Joint positions", joint_positions)
 
-
+    # Until the gripper is pressed, constanly send the current robot pose so that
+    # the UR program will start with this pose and not jump to pose values previously stored in its registers
     gripper_pressed_before = False
     while not gripper_pressed_before:
         new_controller_pose, gripper_pressed, _ = getControllerPoseAndTrigger(oculus, is_right_arm)
-        # print("Never pressed gripper ---")
         updateRobotPose(modbus_client, robot_pose, joint_positions[4])
         if gripper_pressed:
             gripper_pressed_before = True
             print("Breaking")
             break
 
+    # Update Robot arm and gripper based on controller
     prev_gripper = False
     while True:
         new_controller_pose, gripper_pressed, trigger_pressed = getControllerPoseAndTrigger(oculus, is_right_arm)
-        # Only handle movements when right gripper is pressed
+        # Only handle movements when right controller gripper is pressed
         if gripper_pressed:
             if not prev_gripper:
                 # Update current controller position to be new controller position on new gripper press
                 controller_pose = new_controller_pose
             else:
+                # Get the delta in controller position and rotation
                 ee_delta = getEEDelta(controller_pose, new_controller_pose, is_right_arm)
+                # Only update robot position if change in controller position meets a 
+                # certain threshold. This prevents robot from changing position when
+                # the control is almost still
                 if deltaMeetsThreshold(ee_delta):
+                    # Restrict deltas to a maximum value to avoid large jumps in robot position
                     ee_delta = restrictDelta(ee_delta)
-                    # ee_delta = decreaseRotationSensitivies(ee_delta)
-                    # Keep the pitch the same and handle wrist rotation separately later
-                    # wrist_1_delta = ee_delta[3]
-                    # ee_delta[3] = 0
-                    # ee_delta[4] = 0
-                    # ee_delta[5] = 0
                     new_robot_pose = robot_pose + ee_delta
-
-                    # joint_positions = arm.getj()
-                    # # wrist_2_position = joint_positions[4] + ee_delta[4]
-                    # new_wrist_delta = ee_delta[5] * 2
-                    
-                    # print("new_wrist_delta", new_wrist_delta)
-                    # if new_wrist_delta > 0 and new_wrist_delta > 1:
-                    #     print("--- Restricting new wrist delta ---", new_wrist_delta)
-                    #     new_wrist_delta = 0.5
-                    # elif new_wrist_delta < 0 and new_wrist_delta < -1:
-                    #     print("--- Restricting new wrist delta ---", new_wrist_delta)
-                    #     new_wrist_delta = -0.5
-                    # joint_positions[5] += new_wrist_delta
-
                     updateRobotPose(modbus_client, new_robot_pose, 0)
                     controller_pose = new_controller_pose
                     robot_pose = new_robot_pose
                 else:
-                    # print("delta did not meet threshold", ee_delta)
                     pass
 
+            # Robot Gripper open and close (currently only for the right arm)
             if is_right_arm:
                 if trigger_pressed:
                     print("Moving gripper")
@@ -250,16 +236,17 @@ def arm_control_thread(arm, gripper, modbus_client, is_right_arm):
                 else:
                     moveGripper(gripper, close=False)
     
-
             prev_gripper = True
         else:
             prev_gripper = False
 
         sleep(0.005)
 
-
-right_arm_thread = threading.Thread(target=arm_control_thread, args=(right_arm, gripper, right_arm_modbus_client, True))
-left_arm_thread = threading.Thread(target=arm_control_thread, args=(left_arm, None, left_arm_modbus_client, False))
+"""Start arm control threads"""
+right_arm_thread = threading.Thread(target=arm_control_thread,
+                                    args=(right_arm, gripper, right_arm_modbus_client, True))
+left_arm_thread = threading.Thread(target=arm_control_thread,
+                                   args=(left_arm, None, left_arm_modbus_client, False))
 right_arm_thread.start()
 left_arm_thread.start()
 
