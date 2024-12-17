@@ -1,13 +1,7 @@
 from oculus_reader.oculus_reader.reader import OculusReader
 from time import sleep
-import urx
+from URnterface import URInterface
 import numpy as np
-import pymodbus.client as ModbusClient
-from pymodbus.framer import Framer
-from pymodbus.payload import BinaryPayloadBuilder
-from pymodbus.constants import Endian
-from robotiq_modbus_controller.driver import RobotiqModbusRtuDriver
-import m3d
 import threading
 
 class OculusTeleopInterface:
@@ -15,6 +9,7 @@ class OculusTeleopInterface:
                     right_arm_start_joint__positions=None, left_arm_start_joint__positions=None,
                     robotiq_gripper_port='/dev/ttyUSB0'):
         # Initialize member variables
+        self.is_ready = False
         self.reset_arms = reset_arms
         self.right_arm_ip = right_arm_ip
         self.left_arm_ip = left_arm_ip
@@ -35,30 +30,9 @@ class OculusTeleopInterface:
         print("OculusTeleopInterface: Initialized Oculus")
 
         # Initialize UR Arms
-        self.right_arm = urx.Robot(self.right_arm_ip)
-        self.left_arm = urx.Robot(self.left_arm_ip)
-        print("OculusTeleopInterface: Initialized URX Connections")
-
-        # Initialize Modbus Clients
-        self.right_arm_modbus_client = ModbusClient.ModbusTcpClient(
-            right_arm_ip,
-            port=502,
-            framer=Framer.SOCKET
-        )
-        self.left_arm_modbus_client = ModbusClient.ModbusTcpClient(
-            left_arm_ip,
-            port=502,
-            framer=Framer.SOCKET
-        )
-        self.right_arm_modbus_client.connect()
-        self.left_arm_modbus_client.connect()
-        print("OculusTeleopInterface: Initialized Modbus Clients")
-
-        # Initialize Robotiq 3f Gripper
-        self.robotiq_gripper = RobotiqModbusRtuDriver(self.robotiq_gripper_port)
-        self.robotiq_gripper.connect()
-        self.robotiq_gripper.activate()
-        print("OculusTeleopInterface: Initialized Robotiq 3f Gripper")
+        self.right_arm = URInterface(self.right_arm_ip, has_robotiq_gripper=True)
+        self.left_arm = URInterface(self.left_arm_ip)
+        print("OculusTeleopInterface: Initialized UR Interfaces")
 
         # Optionally reset arms to a predefined start position
         if self.reset_arms:
@@ -70,30 +44,27 @@ class OculusTeleopInterface:
             print("OculusTeleopInterface: Finished setting left arm to start position")
                     
         # Start arm control threads
-        right_arm_thread = threading.Thread(target=self.arm_control_thread,
-                                            args=(self.right_arm, self.robotiq_gripper,
-                                                  self.right_arm_modbus_client, True))
-        left_arm_thread = threading.Thread(target=self.arm_control_thread,
-                                        args=(self.left_arm, None, self.left_arm_modbus_client, False))
+        right_arm_thread = threading.Thread(target=self.arm_control_thread, args=(self.right_arm, True))
+        left_arm_thread = threading.Thread(target=self.arm_control_thread, args=(self.left_arm, False))
         right_arm_thread.start()
         print("OculusTeleopInterface: Begin Right arm Teleop")
         left_arm_thread.start()
         print("OculusTeleopInterface: Begin Left arm Teleop")
+        self.is_ready = True
 
         """ Arm Control """
-    def arm_control_thread(self, arm, gripper, modbus_client, is_right_arm):
+    def arm_control_thread(self, arm, is_right_arm):
         global oculus
         # Get Initial Controller Position and Robot Pose
         controller_pose, _, _ = self.getControllerPoseAndTrigger(is_right_arm)
-        robot_pose = arm.get_pose_array()
-        joint_positions = arm.getj()
+        robot_pose = arm.getPose()
 
         # Until the gripper is pressed, constanly send the current robot pose so that
         # the UR program will start with this pose and not jump to pose values previously stored in its registers
         gripper_pressed_before = False
         while not gripper_pressed_before:
             new_controller_pose, gripper_pressed, _ = self.getControllerPoseAndTrigger(is_right_arm)
-            self.updateRobotPose(modbus_client, robot_pose, joint_positions[4])
+            arm.updateArmPose(robot_pose)
             if gripper_pressed:
                 gripper_pressed_before = True
                 break
@@ -117,7 +88,7 @@ class OculusTeleopInterface:
                         # Restrict deltas to a maximum value to avoid large jumps in robot position
                         ee_delta = self.restrictDelta(ee_delta)
                         new_robot_pose = robot_pose + ee_delta
-                        self.updateRobotPose(modbus_client, new_robot_pose, 0)
+                        arm.updateArmPose(new_robot_pose)
                         controller_pose = new_controller_pose
                         robot_pose = new_robot_pose
                     else:
@@ -127,9 +98,9 @@ class OculusTeleopInterface:
                 if is_right_arm:
                     if trigger_pressed:
                         print("Moving gripper")
-                        self.moveGripper(gripper, close=True)
+                        arm.moveRobotiqGripper(close=True)
                     else:
-                        self.moveGripper(gripper, close=False)
+                        arm.moveRobotiqGripper(close=False)
         
                 prev_gripper = True
             else:
@@ -193,20 +164,6 @@ class OculusTeleopInterface:
         # ee_delta = np.array([0,0,0, 0, 0, 0])
         return ee_delta
 
-    """ Updates the robot position via modbus """
-    def updateRobotPose(self, client, target_pose, wrist_position):
-        target_pose = np.array(target_pose) * 100
-        builder = BinaryPayloadBuilder(byteorder=Endian.BIG, wordorder=Endian.BIG)
-        for i in range(6):
-            builder.reset()
-            builder.add_16bit_int(int(target_pose[i]))
-            payload = builder.to_registers()
-            client.write_register(128 + i, payload[0])
-        # print("Writing wrist position", wrist_position)
-        wrist_position *= 100
-        builder.add_16bit_int(int(wrist_position))
-        payload = builder.to_registers()
-        client.write_register(134, payload[0])
 
     """ Returns True if a position delta is greater than some threshold across any axis """
     def deltaMeetsThreshold(self, delta):
@@ -234,22 +191,12 @@ class OculusTeleopInterface:
             print("delta after", delta)
         return delta
 
-    def decreaseRotationSensitivies(self, delta):
-        for axis in range(3,6):
-            rotation_value = delta[axis]
-            less_sensitive_rotation = rotation_value / 2
-            if less_sensitive_rotation < 1e-2:
-                delta[axis] = 0
-            else:
-                delta[axis] = less_sensitive_rotation
-        return delta
-
-    """ Moves gripper to position 0 (open) or 200 (closed) """
-    def moveGripper(self, gripper, close=True):
-        gripper_speed = 4
-        gripper_force = 1
-        gripper_pos = 0
-        if close:
-            gripper_pos = 200
+    """ Returns true when the arms are ready to be teleoperated"""
+    def isReady(self):
+        return self.is_ready
+    
+    """ Get the observation for each arm (joint_pos, gripper) """
+    def getObservation(self):
+        return self.right_arm.getObservation()
             
 
