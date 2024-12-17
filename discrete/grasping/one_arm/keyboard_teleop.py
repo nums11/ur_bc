@@ -3,7 +3,7 @@ from pynput.keyboard import Key, Listener
 from robotiq_modbus_controller.driver import RobotiqModbusRtuDriver
 import urx
 
-robot = urx.Robot("192.168.2.2")
+robot = urx.Robot("192.168.1.2")
 
 port = "/dev/ttyUSB0"
 gripper = RobotiqModbusRtuDriver(port)
@@ -48,8 +48,6 @@ def moveArm(action):
         gripper.move(pos=0, speed=gripper_speed, force=1)
     elif action == 13:
         gripper.move(pos=100, speed=gripper_speed, force=1)
- 
-
     if action in list(range(12)):
         # robot.movejInvKin(pose)
         robot.servojInvKin(pose)
