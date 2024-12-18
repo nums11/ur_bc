@@ -14,6 +14,13 @@ class OculusTeleopInterface:
         self.right_arm_ip = right_arm_ip
         self.left_arm_ip = left_arm_ip
         self.robotiq_gripper_port = robotiq_gripper_port
+        self.current_obs = None
+        self.current_right_arm_action = None
+        self.current_left_arm_action = None
+        self.right_arm_action_updated = False
+        self.left_arm_action_updated = False
+        self.current_obs_action_pair = ()
+        self.lock = threading.Lock()
         if right_arm_start_joint__positions == None:
             self.right_arm_start_joint__positions = tuple([-0.02262999405073174, -1.1830826636872513, -2.189683323644428,
                                         -1.095669650507004, -4.386985456001609, 3.2958897411425156])
@@ -43,6 +50,10 @@ class OculusTeleopInterface:
             self.left_arm.movej(self.left_arm_start_joint__positions)
             print("OculusTeleopInterface: Finished setting left arm to start position")
                     
+        # Start observation and action capture thread
+        obs_action_capture_thread = threading.Thread(target=self.obsActionCaptureThread)
+        obs_action_capture_thread.start()
+        
         # Start arm control threads
         right_arm_thread = threading.Thread(target=self.arm_control_thread, args=(self.right_arm, True))
         left_arm_thread = threading.Thread(target=self.arm_control_thread, args=(self.left_arm, False))
@@ -50,9 +61,23 @@ class OculusTeleopInterface:
         print("OculusTeleopInterface: Begin Right arm Teleop")
         left_arm_thread.start()
         print("OculusTeleopInterface: Begin Left arm Teleop")
+
         self.is_ready = True
 
-        """ Arm Control """
+    """ Observation """
+    def obsActionCaptureThread(self):
+        # Loop constantly getting the observation, then waiting until the next action
+        # updates in the left and right arm, then store the observation and action pair
+        while True:
+            obs = self.getObservation()
+            while not (self.right_arm_action_updated and self.left_arm_action_updated):
+                continue
+            self.current_obs_action_pair = (obs, {'left_arm': self.current_left_arm_action, 'right_arm': self.current_right_arm_action})
+            with self.lock:
+                self.right_arm_action_updated = False
+                self.left_arm_action_updated = False
+
+    """ Arm Control """
     def arm_control_thread(self, arm, is_right_arm):
         global oculus
         # Get Initial Controller Position and Robot Pose
@@ -63,6 +88,8 @@ class OculusTeleopInterface:
         # the UR program will start with this pose and not jump to pose values previously stored in its registers
         gripper_pressed_before = False
         while not gripper_pressed_before:
+            # No movement yet so set action to 0
+            self.storeAction(is_right_arm, self.zeroAction())
             new_controller_pose, gripper_pressed, _ = self.getControllerPoseAndTrigger(is_right_arm)
             arm.updateArmPose(robot_pose)
             if gripper_pressed:
@@ -87,27 +114,32 @@ class OculusTeleopInterface:
                     if self.deltaMeetsThreshold(ee_delta):
                         # Restrict deltas to a maximum value to avoid large jumps in robot position
                         ee_delta = self.restrictDelta(ee_delta)
+                        # Store the current action
+                        self.storeAction(is_right_arm, ee_delta)
+                        # Apply the action
                         new_robot_pose = robot_pose + ee_delta
                         arm.updateArmPose(new_robot_pose)
+                        # Update the current controller and robot pose for the next iteration
                         controller_pose = new_controller_pose
                         robot_pose = new_robot_pose
                     else:
-                        pass
+                        self.storeAction(is_right_arm, self.zeroAction())
 
                 # Robot Gripper open and close (currently only for the right arm)
                 if is_right_arm:
                     if trigger_pressed:
-                        print("Moving gripper")
                         arm.moveRobotiqGripper(close=True)
                     else:
                         arm.moveRobotiqGripper(close=False)
         
                 prev_gripper = True
             else:
+                self.storeAction(is_right_arm, self.zeroAction())
                 prev_gripper = False
 
             sleep(0.005)
 
+    """ Get the rotational roll, pitch, and yaw from a transformation matrix """
     def get_roll_pitch_yaw_from_matrix(self, matrix):
         # Extract the rotation part from the matrix
         rotation_matrix = matrix[:3, :3]
@@ -129,6 +161,7 @@ class OculusTeleopInterface:
             yaw = np.arctan2(rotation_matrix[1, 0], rotation_matrix[0, 0])
         return roll, pitch, yaw
 
+    """ Get translational and rotational pose from a transformation matrix  """
     def get6dPoseFromMatrix(self, matrix):
         if matrix.shape != (4, 4):
             raise ValueError("Input must be a 4x4 transformation matrix.")
@@ -164,7 +197,6 @@ class OculusTeleopInterface:
         # ee_delta = np.array([0,0,0, 0, 0, 0])
         return ee_delta
 
-
     """ Returns True if a position delta is greater than some threshold across any axis """
     def deltaMeetsThreshold(self, delta):
         threshold = 1e-2
@@ -175,20 +207,11 @@ class OculusTeleopInterface:
 
     """ Ensures the delta across any axis is not larger than a fixed value"""
     def restrictDelta(self, delta):
-        delta_restricted = False
         for axis, delta_axis in enumerate(delta):
             if delta_axis > 0 and delta_axis > 0.5:
-                print("----------- RESTRICTED DELTA ---------------------")
-                print("Delta  on axis", axis, "was", delta_axis, "setting to 0.05")
                 delta[axis] = 0.05
-                delta_restricted = True
             elif delta_axis < 0 and delta_axis < -0.5:
-                print("----------- RESTRICTED DELTA ---------------------")
-                print("Delta  on axis", axis, "was", delta_axis, "setting to -0.05")
                 delta[axis] = -0.05
-                delta_restricted = True
-        if delta_restricted:
-            print("delta after", delta)
         return delta
 
     """ Returns true when the arms are ready to be teleoperated"""
@@ -197,6 +220,28 @@ class OculusTeleopInterface:
     
     """ Get the observation for each arm (joint_pos, gripper) """
     def getObservation(self):
-        return self.right_arm.getObservation()
-            
+        return [self.left_arm.getObservation(), self.right_arm.getObservation()]
 
+    """ Return the buttons from the oculus controller """ 
+    def getButtons(self):
+        _, buttons = self.oculus.get_transformations_and_buttons()
+        return buttons
+    
+    """ Store the most recent action for the right or left arm """
+    def storeAction(self, is_right_arm, action):
+        if is_right_arm:
+            self.current_right_arm_action = action
+            with self.lock:
+                self.right_arm_action_updated = True
+        else:
+            self.current_left_arm_action = action
+            with self.lock:
+                self.left_arm_action_updated = True
+    
+    """ Return the current observation and action """
+    def getObsAndAction(self):
+        return self.current_obs_action_pair
+    
+    """ Return a zero action """
+    def zeroAction(self):
+        return [0,0,0,0,0,0]

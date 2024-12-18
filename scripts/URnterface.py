@@ -40,7 +40,6 @@ class URInterface:
 
     """ Updates the robot position via modbus """
     def updateArmPose(self, target_pose):
-        print("In updateArmPose sending target pose", target_pose)
         # Pose values will be divided by 100 in URScript
         target_pose = np.array(target_pose) * 100
         builder = BinaryPayloadBuilder(byteorder=Endian.BIG, wordorder=Endian.BIG)
@@ -57,4 +56,7 @@ class URInterface:
 
     """ Get observation (joint pos, gripper) """
     def getObservation(self):
-        return (self.arm.getj(), self.robotiq_gripper.getGripperStatus())
+        if self.has_robotiq_gripper:
+            return (self.arm.getj(), self.robotiq_gripper.getGripperStatus())
+        else:
+            return self.arm.getj()
