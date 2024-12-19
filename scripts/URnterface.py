@@ -33,7 +33,11 @@ class URInterface:
 
     """ Send a movej command using urx """
     def movej(self, joint_positions):
-        self.arm.movej(joint_positions)
+        self.arm.movej(joint_positions, vel=0.5)
+
+    """ Send a servoj command using urx """
+    def servoj(self, joint_positions):
+        self.arm.servoj(joint_positions)
 
     """ Get arm pose using urx """
     def getPose(self):
