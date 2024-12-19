@@ -43,20 +43,30 @@ def saveTrajectory(trajectory):
 # and share their status globally
 def buttonListenerThread():
     global a_pressed_and_released, b_pressed_and_released, lock
-    a_pressed = False
-    b_pressed = False
+    a_currently_pressed = False
+    b_currently_pressed = False
+    a_prev_pressed = False
+    b_prev_pressed = False
     print("In button listener thread")
     while True:
         buttons = oculus_teleop.getButtons()
-        with lock:
-            if buttons['A']:
-                a_pressed = True
-            elif buttons['B']:
-                b_pressed = True
-            elif not buttons['A'] and a_pressed:
+        a_currently_pressed = buttons['A']
+        b_currently_pressed = buttons['B']
+
+        if (not a_currently_pressed) and a_prev_pressed:
+            with lock:
                 a_pressed_and_released = True
-            elif not buttons['B'] and b_pressed:
+
+        if (not b_currently_pressed) and b_prev_pressed:
+            with lock:
                 b_pressed_and_released = True
+
+        a_prev_pressed = a_currently_pressed
+        b_prev_pressed = b_currently_pressed
+
+
+def printTrajCollectionMessage():
+    print("Press 'A' to start collecting Trajectory, 'A' again to save trajectory, and 'B' to discard trajectory.")
 
 # def listenforAPress():
 #     a_pressed = False
@@ -80,39 +90,45 @@ def collectTrajThread():
     collection_freq_time = 1 / collection_freq_hz
     trajectory = {}
     t = 0
+    printTrajCollectionMessage()
     while True:
-        with lock:
-            if collecting_trajectory:
-                # Save a trajectory when 'A' is pressed and released
-                # Discard it when 'B' is pressed and released
-                if a_pressed_and_released:
-                    print("Saving Trajectory")
-                    saveTrajectory(trajectory)
-                elif b_pressed_and_released:
-                    print("Discarding Trajectory")
-                
-                # Reset the trajectory variables and button presses on 'A' or 'B' press and release
-                    if a_pressed_and_released or b_pressed_and_released:
-                        trajectory = {}
-                        t = 0
-                        a_pressed_and_released = False
-                        b_pressed_and_released = False
-                        collecting_trajectory = False
-                    else:
-                        # Add the current obs, action pair to the trajectory 
-                        obs, action_dict = oculus_teleop.getObsAndAction()
-                        print("Adding too traj: Obs", obs, "action_dict", action_dict)
-                        trajectory[t] = (obs, action_dict)
-
-                # Collect at the specified frequency
-                sleep(collection_freq_time)
-
-            else:
-                # Start collecting the trajectory when 'A' is pressed and released
-                if a_pressed_and_released:
-                    print("Starting Trajectory Collection")
-                    collecting_trajectory = True
+        if collecting_trajectory:
+            # Save a trajectory when 'A' is pressed and released
+            # Discard it when 'B' is pressed and released
+            if a_pressed_and_released:
+                print("Saving Trajectory")
+                saveTrajectory(trajectory)
+                printTrajCollectionMessage()
+            elif b_pressed_and_released:
+                print("Discarding Trajectory")
+                printTrajCollectionMessage()
+            
+            # Reset the trajectory variables and button presses on 'A' or 'B' press and release
+            if a_pressed_and_released or b_pressed_and_released:
+                trajectory = {}
+                t = 0
+                collecting_trajectory = False
+                with lock:
                     a_pressed_and_released = False
+                    b_pressed_and_released = False
+            else:
+                # Add the current obs, action pair to the trajectory 
+                obs, action_dict = oculus_teleop.getObsAndAction()
+                print("Adding to traj: t", t, "obs", obs, "action_dict", action_dict)
+                trajectory[t] = (obs, action_dict)
+                t += 1
+
+            # Collect at the specified frequency
+            sleep(collection_freq_time)
+
+        else:
+            # Start collecting the trajectory when 'A' is pressed and released
+            if a_pressed_and_released:
+                print("Starting Trajectory Collection")
+                collecting_trajectory = True
+                with lock:
+                    a_pressed_and_released = False
+                    b_pressed_and_released = False
 
 
     # listenforAPress()

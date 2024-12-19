@@ -58,10 +58,11 @@ class OculusTeleopInterface:
         right_arm_thread = threading.Thread(target=self.arm_control_thread, args=(self.right_arm, True))
         left_arm_thread = threading.Thread(target=self.arm_control_thread, args=(self.left_arm, False))
         right_arm_thread.start()
-        print("OculusTeleopInterface: Begin Right arm Teleop")
+        print("OculusTeleopInterface: Right arm Teleop Ready")
         left_arm_thread.start()
-        print("OculusTeleopInterface: Begin Left arm Teleop")
+        print("OculusTeleopInterface: Left arm Teleop Ready")
 
+        print("OculusTeleopInterface: Start UR Programs and Begin Teleoperation")
         self.is_ready = True
 
     """ Observation """
