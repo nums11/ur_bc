@@ -8,6 +8,7 @@ class OculusTeleopInterface:
     def __init__(self, right_arm_ip='192.168.2.2', left_arm_ip='192.168.1.2', reset_arms=False,
                     right_arm_start_joint__positions=None, left_arm_start_joint__positions=None,
                     robotiq_gripper_port='/dev/ttyUSB0'):
+        print()
         # Initialize member variables
         self.is_ready = False
         self.reset_arms = reset_arms
@@ -46,22 +47,8 @@ class OculusTeleopInterface:
         # Optionally reset arms to start positions
         if self.reset_arms:
             self.resetArms()
-
-        # Start observation and action capture thread
-        obs_action_capture_thread = threading.Thread(target=self.obsActionCaptureThread)
-        obs_action_capture_thread.start()
-        
-        # Start arm control threads
-        right_arm_thread = threading.Thread(target=self.arm_control_thread, args=(self.right_arm, True))
-        left_arm_thread = threading.Thread(target=self.arm_control_thread, args=(self.left_arm, False))
-        right_arm_thread.start()
-        print("OculusTeleopInterface: Right arm Teleop Ready")
-        left_arm_thread.start()
-        print("OculusTeleopInterface: Left arm Teleop Ready")
-
-        # Set the interface as 'ready'
-        print("OculusTeleopInterface: Start UR Programs and Begin Teleoperation")
-        self.is_ready = True
+        print("OculusTeleopInterface: Finished Initializing OculusTeleopInterface")
+        print()
 
     """ Observation """
     def obsActionCaptureThread(self):
@@ -213,10 +200,6 @@ class OculusTeleopInterface:
                 delta[axis] = -0.05
         return delta
 
-    """ Returns true when the arms are ready to be teleoperated"""
-    def isReady(self):
-        return self.is_ready
-    
     """ Get the observation for each arm (joint_pos, gripper) """
     def getObservation(self):
         return [self.left_arm.getObservation(), self.right_arm.getObservation()]
@@ -251,3 +234,19 @@ class OculusTeleopInterface:
         self.right_arm.resetPosition()
         self.left_arm.resetPosition()
         print("OculusTeleopInterface: Finished resetting arms to start positions")
+
+    """ Start the threads for observation capture and teleoperation """
+    def startTeleop(self):
+        print()
+        # Start observation and action capture thread
+        obs_action_capture_thread = threading.Thread(target=self.obsActionCaptureThread)
+        obs_action_capture_thread.start()
+        # Start arm control threads
+        right_arm_thread = threading.Thread(target=self.arm_control_thread, args=(self.right_arm, True))
+        left_arm_thread = threading.Thread(target=self.arm_control_thread, args=(self.left_arm, False))
+        right_arm_thread.start()
+        print("OculusTeleopInterface: Right arm Teleop Ready")
+        left_arm_thread.start()
+        print("OculusTeleopInterface: Left arm Teleop Ready")
+        print("OculusTeleopInterface: Start UR Programs and Begin Teleoperation")
+        print()
