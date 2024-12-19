@@ -37,19 +37,16 @@ class OculusTeleopInterface:
         print("OculusTeleopInterface: Initialized Oculus")
 
         # Initialize UR Arms
-        self.right_arm = URInterface(self.right_arm_ip, has_robotiq_gripper=True)
-        self.left_arm = URInterface(self.left_arm_ip)
+        self.right_arm = URInterface(
+            self.right_arm_ip, self.right_arm_start_joint__positions, has_robotiq_gripper=True)
+        self.left_arm = URInterface(
+            self.left_arm_ip, self.left_arm_start_joint__positions)
         print("OculusTeleopInterface: Initialized UR Interfaces")
 
-        # Optionally reset arms to a predefined start position
+        # Optionally reset arms to start positions
         if self.reset_arms:
-            print("OculusTeleopInterface: Setting right arm to start position")
-            self.right_arm.movej(self.right_arm_start_joint__positions)
-            print("OculusTeleopInterface: Finished setting right arm to start position")
-            print("OculusTeleopInterface: Setting left arm to start position")
-            self.left_arm.movej(self.left_arm_start_joint__positions)
-            print("OculusTeleopInterface: Finished setting left arm to start position")
-                    
+            self.resetArms()
+
         # Start observation and action capture thread
         obs_action_capture_thread = threading.Thread(target=self.obsActionCaptureThread)
         obs_action_capture_thread.start()
@@ -62,6 +59,7 @@ class OculusTeleopInterface:
         left_arm_thread.start()
         print("OculusTeleopInterface: Left arm Teleop Ready")
 
+        # Set the interface as 'ready'
         print("OculusTeleopInterface: Start UR Programs and Begin Teleoperation")
         self.is_ready = True
 
@@ -246,3 +244,10 @@ class OculusTeleopInterface:
     """ Return a zero action """
     def zeroAction(self):
         return [0,0,0,0,0,0]
+    
+    """ Reset arms to start arms and gripper to start positions """
+    def resetArms(self):
+        print("OculusTeleopInterface: Resetting arms to start positions")
+        self.right_arm.resetPosition()
+        self.left_arm.resetPosition()
+        print("OculusTeleopInterface: Finished resetting arms to start positions")

@@ -11,11 +11,6 @@ class RobotiqGripperInterface:
         self.robotiq_gripper.activate()
         print("RobotiqGripperInterface: Initialized Robotiq 3f Gripper at port", self.port)
 
-        # Open the gripper
-        self.moveRobotiqGripper(close=False)
-        self.gripper_closed = False
-        print("RobotiqGripperInterface: Opened Robotiq 3f Gripper")
-
     """ Moves gripper to position 0 (open) or 200 (closed) """
     def moveRobotiqGripper(self, close=True):
         gripper_speed = 4
@@ -29,3 +24,10 @@ class RobotiqGripperInterface:
     """ Returns true if gripper is closed, false otherwise """
     def getGripperStatus(self):
         return self.gripper_closed
+    
+    """ Reset to start position (open)"""
+    def resetPosition(self):
+        print("RobotiqGripperInterface: Resetting Robotiq 3f Gripper to start position")
+        self.moveRobotiqGripper(close=False)
+        self.gripper_closed = False
+        print("RobotiqGripperInterface: Finished resetting Robotiq 3f Gripper to start position")

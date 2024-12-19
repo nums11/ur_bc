@@ -7,16 +7,17 @@ from RobotiqGripperInterface import RobotiqGripperInterface
 import numpy as np
 
 class URInterface:
-    def __init__(self, ip, has_robotiq_gripper=False, robotiq_gripper_port='/dev/ttyUSB0'):
+    def __init__(self, ip, start_joint_positions, has_robotiq_gripper=False, robotiq_gripper_port='/dev/ttyUSB0'):
         # Initialize member variables
         self.ip = ip
+        self.start_joint_positions = start_joint_positions
         self.has_robotiq_gripper = has_robotiq_gripper
         self.robotiq_gripper_port = robotiq_gripper_port
 
         # Initialize URX connection
         self.arm = urx.Robot(self.ip)
         print("URInterface: Initialized URX Connection To IP", self.ip)
-
+        
         # Initialize Modbus Client
         self.modbus_client = ModbusClient.ModbusTcpClient(
             self.ip,
@@ -60,3 +61,12 @@ class URInterface:
             return (self.arm.getj(), self.robotiq_gripper.getGripperStatus())
         else:
             return self.arm.getj()
+        
+    """ Reset arm to start joint positions and reset gripper """
+    def resetPosition(self):
+        print("URInterface: Resetting Arm at IP", self.ip, "to start position")
+        self.arm.movej(self.start_joint_positions)
+        if self.has_robotiq_gripper:
+            self.robotiq_gripper.resetPosition()
+        print("URInterface: Finished Resetting Arm at IP", self.ip, "to start position")
+        
