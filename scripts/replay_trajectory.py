@@ -2,7 +2,7 @@ import numpy as np
 from URnterface import URInterface
 import threading
 
-data_filepath = "/home/weirdlab/ur_bc/data/traj_2.npz"
+data_filepath = "/home/weirdlab/ur_bc/data/traj_1.npz"
 data = dict(np.load(data_filepath, allow_pickle=True).items())
 
 right_arm = URInterface('192.168.2.2',

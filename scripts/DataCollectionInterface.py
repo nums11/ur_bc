@@ -5,10 +5,11 @@ import os
 import numpy as np
 
 class DataCollectionInterface:
-    def __init__(self, collection_freq_hz=10):
+    def __init__(self, collection_freq_hz=10, remove_zero_actions=False):
         # Initialize member variables
         self.collection_freq_hz = collection_freq_hz
         self.collection_freq_time = 1 / self.collection_freq_hz
+        self.remove_zero_actions = remove_zero_actions
 
         # Instantiate the Oculus Teleop interface and wait until it's ready
         self.oculus_teleop = OculusTeleopInterface(reset_arms=True)
@@ -23,6 +24,22 @@ class DataCollectionInterface:
         print("DataCollectionInterface: Finished Initializing DataCollectionInterface")
         print()
 
+    """ Returns true if an action is a '0' action"""
+    def isZeroAction(self, action):
+        return not np.any(action)
+
+    """ Remove Zero actions from a trajectory"""
+    def removeZeroActions(self, trajectory):
+        traj_len = len(trajectory)
+        num_zero_actions = 0
+        for t in range(traj_len):
+            _, action = trajectory[str(t)]
+            if self.isZeroAction(action['left_arm']) and self.isZeroAction(action['right_arm']):
+                print("DataCollectionInterface: Found zero action at timestep", t)
+                num_zero_actions += 1
+                trajectory.pop(str(t), None)
+        return trajectory, num_zero_actions
+
     # Get the new directory to store the trajectory in based on the 
     # current number of stored trajectories
     def getDatasetFilename(self):
@@ -35,12 +52,16 @@ class DataCollectionInterface:
     # to a numpy file
     def saveTrajectory(self, trajectory):
         filename = self.getDatasetFilename()
-        print("Saving trajectory to path", filename)
+        if self.remove_zero_actions:
+            print("DataCollectionInterface: Removing Zero actions before saving trajectory")
+            trajectory, num_zero_actions = self.removeZeroActions(trajectory)
+            print("DataCollectionInterface: Removed", num_zero_actions, "actions from trajectory")
+        print("DataCollectionInterface: Saving trajectory to path", filename)
         np.savez(filename, **trajectory)
-        print("\n --- Finished Saving Trajectory --- \n")
+        print("\nDataCollectionInterface: Finished saving trajectory \n")
 
     def printTrajCollectionMessage(self):
-        print("\nPress 'A' to start collecting Trajectory, 'A' again to save trajectory, and 'B' to discard trajectory.\n")
+        print("\nDataCollectionInterface: Press 'A' to start collecting Trajectory, 'A' again to save trajectory, and 'B' to discard trajectory.\n")
 
     # Thread to constantly listen for buttons from the oculus
     # and share their status globally

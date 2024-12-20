@@ -1,4 +1,4 @@
 from DataCollectionInterface import DataCollectionInterface
 
-data_collector = DataCollectionInterface()
+data_collector = DataCollectionInterface(remove_zero_actions=True)
 data_collector.startDataCollection()
