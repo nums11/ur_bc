@@ -10,8 +10,8 @@ class OculusTeleopInterface:
                     robotiq_gripper_port='/dev/ttyUSB0'):
         print()
         # Initialize member variables
-        self.is_ready = False
         self.reset_arms = reset_arms
+        self.resetting = False
         self.right_arm_ip = right_arm_ip
         self.left_arm_ip = left_arm_ip
         self.robotiq_gripper_port = robotiq_gripper_port
@@ -54,14 +54,19 @@ class OculusTeleopInterface:
     def obsActionCaptureThread(self):
         # Loop constantly getting the observation, then waiting until the next action
         # updates in the left and right arm, then store the observation and action pair
-        while True:
+        while not self.resetting:
             obs = self.getObservation()
             while not (self.right_arm_action_updated and self.left_arm_action_updated):
-                continue
+                if self.resetting:
+                    break
+                else:
+                    continue
             self.current_obs_action_pair = (obs, {'left_arm': self.current_left_arm_action, 'right_arm': self.current_right_arm_action})
             with self.lock:
                 self.right_arm_action_updated = False
                 self.left_arm_action_updated = False
+
+        print("OculusTeleopInterface: Stopped observation, action capture thread due to reset")
 
     """ Arm Control """
     def arm_control_thread(self, arm, is_right_arm):
@@ -73,7 +78,7 @@ class OculusTeleopInterface:
         # Until the gripper is pressed, constanly send the current robot pose so that
         # the UR program will start with this pose and not jump to pose values previously stored in its registers
         gripper_pressed_before = False
-        while not gripper_pressed_before:
+        while not gripper_pressed_before and not self.resetting:
             # No movement yet so set action to 0
             self.storeAction(is_right_arm, self.zeroAction())
             new_controller_pose, gripper_pressed, _ = self.getControllerPoseAndTrigger(is_right_arm)
@@ -84,7 +89,7 @@ class OculusTeleopInterface:
 
         # Update Robot arm and gripper based on controller
         prev_gripper = False
-        while True:
+        while not self.resetting:
             new_controller_pose, gripper_pressed, trigger_pressed = self.getControllerPoseAndTrigger(is_right_arm)
             # Only handle movements when right controller gripper is pressed
             if gripper_pressed:
@@ -124,6 +129,9 @@ class OculusTeleopInterface:
                 prev_gripper = False
 
             sleep(0.005)
+        
+        print("OculusTeleopInterface: Stopped arm control thread due to reset")
+        
 
     """ Get the rotational roll, pitch, and yaw from a transformation matrix """
     def get_roll_pitch_yaw_from_matrix(self, matrix):
@@ -231,22 +239,27 @@ class OculusTeleopInterface:
     """ Reset arms to start arms and gripper to start positions """
     def resetArms(self):
         print("OculusTeleopInterface: Resetting arms to start positions")
+        # Kills observation threads and arm control threads if they are active
+        self.resetting = True
         self.right_arm.resetPosition()
         self.left_arm.resetPosition()
+        self.resetting = False
+        print("Set resetting to false", self.resetting)
         print("OculusTeleopInterface: Finished resetting arms to start positions")
 
     """ Start the threads for observation capture and teleoperation """
     def startTeleop(self):
         print()
-        # Start observation and action capture thread
-        obs_action_capture_thread = threading.Thread(target=self.obsActionCaptureThread)
-        obs_action_capture_thread.start()
-        # Start arm control threads
-        right_arm_thread = threading.Thread(target=self.arm_control_thread, args=(self.right_arm, True))
-        left_arm_thread = threading.Thread(target=self.arm_control_thread, args=(self.left_arm, False))
-        right_arm_thread.start()
+        # Initialize Threads and start them
+        self.obs_action_capture_thread = threading.Thread(target=self.obsActionCaptureThread)
+        self.right_arm_thread = threading.Thread(target=self.arm_control_thread, args=(self.right_arm, True))
+        self.left_arm_thread = threading.Thread(target=self.arm_control_thread, args=(self.left_arm, False))
+        print("OculusTeleopInterface: Initialized Observation and Arm Control Threads")
+        self.obs_action_capture_thread.start()
+        print("OculusTeleopInterface: Started thread for observation and action recording")
+        self.right_arm_thread.start()
         print("OculusTeleopInterface: Right arm Teleop Ready")
-        left_arm_thread.start()
+        self.left_arm_thread.start()
         print("OculusTeleopInterface: Left arm Teleop Ready")
         print("OculusTeleopInterface: Start UR Programs and Begin Teleoperation")
         print()

@@ -111,6 +111,7 @@ class DataCollectionInterface:
                         self.b_pressed_and_released = False
                     self.oculus_teleop.resetArms()
                     self.printTrajCollectionMessage()
+                    self.oculus_teleop.startTeleop()
                 else:
                     # Add the current obs, action pair to the trajectory 
                     obs, action_dict = self.oculus_teleop.getObsAndAction()
