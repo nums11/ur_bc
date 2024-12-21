@@ -4,6 +4,7 @@ class RobotiqGripperInterface:
     def __init__(self, port='/dev/ttyUSB0'):
         # Initialize member variables
         self.port = port
+        self.gripper_closed = False
 
         # Initialize Robotiq 3f gripper
         self.robotiq_gripper = RobotiqModbusRtuDriver(self.port)
