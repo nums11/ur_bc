@@ -41,7 +41,8 @@ class OculusTeleopInterface:
         self.right_arm = URInterface(
             self.right_arm_ip, self.right_arm_start_joint__positions, has_robotiq_gripper=True)
         self.left_arm = URInterface(
-            self.left_arm_ip, self.left_arm_start_joint__positions)
+            self.left_arm_ip, self.left_arm_start_joint__positions, has_robotiq_gripper=True,
+            robotiq_gripper_port='/dev/ttyUSB2')
         print("OculusTeleopInterface: Initialized UR Interfaces")
 
         # Optionally reset arms to start positions
@@ -116,12 +117,10 @@ class OculusTeleopInterface:
                     else:
                         self.storeAction(is_right_arm, self.zeroAction())
 
-                # Robot Gripper open and close (currently only for the right arm)
-                if is_right_arm:
-                    if trigger_pressed:
-                        arm.moveRobotiqGripper(close=True)
-                    else:
-                        arm.moveRobotiqGripper(close=False)
+                if trigger_pressed:
+                    arm.moveRobotiqGripper(close=True)
+                else:
+                    arm.moveRobotiqGripper(close=False)
         
                 prev_gripper = True
             else:
@@ -185,6 +184,7 @@ class OculusTeleopInterface:
         if not is_right_arm:
             ee_delta[0] = -1 * ee_delta[0]
             ee_delta[2] = -1 * ee_delta[2]
+            ee_delta[5] = -1 * ee_delta[5]
         # Move controller axes to correspond with the UR
         ee_delta = np.array([ee_delta[2], ee_delta[0], ee_delta[1],
                             ee_delta[5], ee_delta[4], -1 * ee_delta[3]])
