@@ -185,9 +185,17 @@ class OculusTeleopInterface:
             ee_delta[0] = -1 * ee_delta[0]
             ee_delta[2] = -1 * ee_delta[2]
             ee_delta[5] = -1 * ee_delta[5]
+            # ee_delta[3] = 0
+
+        # ee_delta[3] = 0
+        # ee_delta[4] = 0
+        # ee_delta[5] = 0
+
         # Move controller axes to correspond with the UR
+        # ee_delta = np.array([ee_delta[2], ee_delta[0], ee_delta[1],
+        #                     ee_delta[5], ee_delta[4], -1 * ee_delta[3]])
         ee_delta = np.array([ee_delta[2], ee_delta[0], ee_delta[1],
-                            ee_delta[5], ee_delta[4], -1 * ee_delta[3]])
+                    ee_delta[5], 0, -1 * ee_delta[3]])
         # ee_delta = np.array([0,0,0, 0, 0, 0])
         return ee_delta
 

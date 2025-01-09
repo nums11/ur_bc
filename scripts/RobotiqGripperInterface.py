@@ -18,7 +18,7 @@ class RobotiqGripperInterface:
         gripper_force = 1
         gripper_pos = 0
         if close:
-            gripper_pos = 200
+            gripper_pos = 250
         self.robotiq_gripper.move(pos=gripper_pos, speed=gripper_speed, force=gripper_force)
         self.gripper_closed = close
 
