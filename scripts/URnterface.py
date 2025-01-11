@@ -42,6 +42,12 @@ class URInterface:
     """ Get arm pose using urx """
     def getPose(self):
         return self.arm.get_pose_array()
+    
+    def getj(self):
+        return self.arm.getj()
+
+    def getGripper(self):
+        return self.robotiq_gripper.getGripperStatus()
 
     """ Updates the robot position via modbus """
     def updateArmPose(self, target_pose):

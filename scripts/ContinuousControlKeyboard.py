@@ -1,6 +1,4 @@
-from URnterface import URInterface
 from pynput.keyboard import Listener
-from time import sleep
 import numpy as np
 
 # Define keyboard control class
@@ -100,39 +98,10 @@ class ContinuousControlKeyboard:
         elif char in self.right_arm_rotational_chars:
             self.right_arm_rot_delta -= self.right_arm_key_to_delta_mappings[char]
 
-    def advance(self):
+    def getArmDeltasAndGrippersFromKeyPress(self):
         return ((np.concatenate((self.left_arm_pos_delta, self.left_arm_rot_delta)), self.close_left_gripper), 
                 (np.concatenate((self.right_arm_pos_delta, self.right_arm_rot_delta)), self.close_right_gripper))
     
-# Initialize Arms
-right_arm_start_joint__positions = tuple([-0.02262999405073174, -1.1830826636872513, -2.189683323644428,
-                                        -1.095669650507004, -4.386985456001609, 3.2958897411425156])
-left_arm_start_joint__positions = tuple([0.1001404325810099, -1.9640431421070108, 2.192831819213297,
-                                                4.154566166681737, -1.5883319440702799, 2.385492181115367])
-right_arm = URInterface('192.168.2.2', right_arm_start_joint__positions, has_robotiq_gripper=True)
-left_arm = URInterface('192.168.1.2', left_arm_start_joint__positions, has_robotiq_gripper=True,
-                       robotiq_gripper_port='/dev/ttyUSB2')
-right_arm.resetPosition()
-left_arm.resetPosition()
-right_arm_pose = right_arm.getPose()
-left_arm_pose = left_arm.getPose()
-for _ in range(10):
-    right_arm.updateArmPose(right_arm_pose)
-    left_arm.updateArmPose(left_arm_pose)
-
-# Control loop
-keyboard = ContinuousControlKeyboard()
-while True:
-    left_arm_info, right_arm_info = keyboard.advance()
-    left_arm_delta, left_gripper = left_arm_info
-    right_arm_delta, right_gripper = right_arm_info
-    # print("left_arm_delta", left_arm_delta, "left_gripper", left_gripper, "right_arm_delta", right_arm_delta, "right_gripper", right_gripper)
-    # Update the poses basded on the delta
-    left_arm_pose += left_arm_delta
-    right_arm_pose += right_arm_delta
-    # Move the arms and grippers
-    left_arm.updateArmPose(left_arm_pose)
-    right_arm.updateArmPose(right_arm_pose)
-    left_arm.moveRobotiqGripper(left_gripper)
-    right_arm.moveRobotiqGripper(right_gripper)
-    sleep(0.05)
+    def resetGripperValues(self):
+        self.close_left_gripper = False
+        self.close_right_gripper = False
