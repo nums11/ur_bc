@@ -2,4 +2,4 @@
 *.ply
 *.npy
 *.npz
-data/
+data/*
