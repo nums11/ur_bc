@@ -16,7 +16,8 @@ class DataInterface:
 
         print("Initialized DataInterface")
 
-    def startDataCollection(self, collection_freq_hz=10, remove_zero_actions=False):
+    def startDataCollection(self, collection_freq_hz=30, remove_zero_actions=False):
+        print("DataInterface collection frequency:", collection_freq_hz, "hz")
         self.keyboard_listener.start()
         self.teleop_interface.startTeleop()
         # wait for teleop thread to start
@@ -107,29 +108,44 @@ class DataInterface:
         np.savez(filename, **trajectory)
         print("\nDataInterface: Finished saving trajectory \n")
 
-    def replayTrajectory(self, traj_file_path, replay_freq_hz=5):
+    def replayTrajectory(self, traj_file_path, joint_position_replay=False):
         trajectory = dict(np.load(traj_file_path, allow_pickle=True).items())
-        print(trajectory)
         sorted_timesteps = sorted(trajectory.keys(), key=lambda x: int(x))
+        print("DataInterface: Replaying Trajectory of length", len(sorted_timesteps))
         for t in sorted_timesteps:
             print("Timestep", t)
-            obs, _ = trajectory[str(t)]
-            left_arm_j = obs['left_arm_j']
-            right_arm_j = obs['right_arm_j']
-            left_gripper = obs['left_gripper']
-            right_gripper = obs['right_gripper']
+            obs, action = trajectory[str(t)]
+            if joint_position_replay:
+                left_action = obs['left_arm_j']
+                right_action = obs['right_arm_j']
+                left_gripper = obs['left_gripper']
+                right_gripper = obs['right_gripper']
+            else:
+                left_action = action['left_arm_delta']
+                right_action = action['right_arm_delta']
+                left_gripper = action['left_gripper']
+                right_gripper = action['right_gripper']
+                print(left_action, left_gripper, right_action, right_gripper)
             left_arm_thread = threading.Thread(target=self.armMovementThread,
-                                            args=(self.teleop_interface.left_arm, left_arm_j, left_gripper))
+                                            args=(self.teleop_interface.left_arm, left_action, joint_position_replay, left_gripper))
             right_arm_thread = threading.Thread(target=self.armMovementThread,
-                                            args=(self.teleop_interface.right_arm, right_arm_j, right_gripper))
+                                            args=(self.teleop_interface.right_arm, right_action, joint_position_replay, right_gripper))
             right_arm_thread.start()
             left_arm_thread.start()
             right_arm_thread.join()
-            left_arm_thread.join()    
+            left_arm_thread.join()
 
-
-    def armMovementThread(self, arm, joint_positions, gripper=None):
-        arm.movej(joint_positions)
+    def armMovementThread(self, arm, action, joint_position_replay=False, gripper=None):
+        if joint_position_replay:
+            # action is 6d joint position
+            arm.movej(action)
+        else:
+            # action is 6d ee position
+            # action = np.zeros(6)
+            # print("overwriting action", action)
+            pose = arm.getPose()
+            pose += action
+            arm.movejInvKin(pose)
         if gripper is not None:
             arm.moveRobotiqGripper(gripper)
 

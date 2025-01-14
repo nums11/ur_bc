@@ -35,6 +35,10 @@ class URInterface:
     def movej(self, joint_positions):
         self.arm.movej(joint_positions, vel=0.5)
 
+    """ Send a movej(get_inverse_kin) command using urx """
+    def movejInvKin(self, joint_positions):
+        self.arm.movejInvKin(joint_positions)
+
     """ Send a servoj command using urx """
     def servoj(self, joint_positions):
         self.arm.servoj(joint_positions)
