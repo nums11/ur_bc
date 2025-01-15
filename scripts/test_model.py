@@ -13,6 +13,7 @@ def convertTeleopObsToModelObs(obs):
     # return np.concatenate((left_arm_j, left_obs_gripper, right_arm_j, right_obs_gripper))
     return np.concatenate((left_arm_j, left_obs_gripper))
 
+# For ee delta
 # def armMovementThread(arm, delta, gripper=None):
 #     # delta = np.zeros(6)
 #     # delta[5] = 0.01
@@ -28,12 +29,19 @@ def convertTeleopObsToModelObs(obs):
 
 def armMovementThread(arm, joint_positions, gripper=None):
     arm.movej(joint_positions)
+    print("Received gripper", gripper)
     if gripper is not None:
-        if gripper < 0.5:
+        if gripper < 0.4:
             gripper = False
         else:
             gripper = True
+            print("Should close gripper! --------")
         arm.moveRobotiqGripper(gripper)
+        if gripper == True:
+            print("Waiting for gripper to close")
+            sleep(1)
+
+
 
 device = (
     "cuda"
@@ -64,8 +72,9 @@ class NeuralNetwork(nn.Module):
     
 
 model = NeuralNetwork().to(device)
-model_path = '/home/weirdlab/ur_bc/models/cont_bc_model_1_arm_35_demos_10hz_15_epochs_joint.pth'
+model_path = '/home/weirdlab/ur_bc/models/cont_simple_pick_model_jpdelta_35_demos_3_epochs_no_zero_actions_noisy_d7.pth'
 model.load_state_dict(torch.load(model_path))
+
 model.eval()
 
 teleop = ContKeyboardTeleopInterface()
@@ -77,13 +86,23 @@ while True:
     # print(obs)
     model_obs = convertTeleopObsToModelObs(obs)
     model_obs = torch.Tensor(model_obs).to(device)
+    print("model obs", model_obs)
+    # sleep(100)
     predictions = model(model_obs).detach().cpu().numpy()
     print("predictions", predictions)
     # left_arm_delta = predictions[:6]
     # left_gripper = predictions[6]
 
-    new_left_arm_j = predictions[:6]
+    # new_left_arm_j = predictions[:6]
+    current_left_arm_j = model_obs[:6].detach().cpu().numpy()
+    joint_delta = predictions[:6]
+    new_left_arm_j = np.add(current_left_arm_j, joint_delta)
     new_left_gripper = predictions[6]
+    print("new_left_gripper before", new_left_gripper)
+    new_left_gripper /= 0.02
+    print("new_left_gripper after", new_left_gripper)
+
+    # For joint delta
     # right_arm_delta = predictions[7:13]
     # right_arm_delta = np.zeros(6)
     # right_gripper = predictions[13]
@@ -94,6 +113,7 @@ while True:
     # print("right_gripper", right_gripper)
     left_arm_thread = threading.Thread(target=armMovementThread,
                                     args=(teleop.left_arm, new_left_arm_j, new_left_gripper))
+
     # right_arm_thread = threading.Thread(target=armMovementThread,
     #                                 args=(teleop.right_arm, right_arm_delta, right_gripper))
     left_arm_thread.start()

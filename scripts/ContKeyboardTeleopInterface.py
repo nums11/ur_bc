@@ -15,11 +15,15 @@ class ContKeyboardTeleopInterface:
                                                 -1.095669650507004, -4.386985456001609, 3.2958897411425156])
         self.left_arm_start_joint__positions = left_arm_start_joint__positions
         if left_arm_start_joint__positions == None:
-            self.left_arm_start_joint__positions = tuple([0.1001404325810099, -1.9640431421070108, 2.192831819213297,
-                                                        4.154566166681737, -1.5883319440702799, 2.385492181115367])
+            self.left_arm_start_joint__positions = tuple([0.04474830963143529, -1.6422924423175793, 1.9634950313912025,
+                                                4.267360912521422, -1.4365121397580038, 2.3399834772053114])
+            # self.left_arm_start_joint__positions = tuple([0.1001404325810099, -1.9640431421070108, 2.192831819213297,
+            #                                             4.154566166681737, -1.5883319440702799, 2.385492181115367])
         self.right_arm = URInterface(right_arm_ip, self.right_arm_start_joint__positions, has_robotiq_gripper=right_arm_has_gripper)
         self.left_arm = URInterface(left_arm_ip, self.left_arm_start_joint__positions, has_robotiq_gripper=left_arm_has_gripper,
                             robotiq_gripper_port='/dev/ttyUSB2')
+        self.right_arm_pose = self.right_arm.getPose()
+        self.left_arm_pose = self.left_arm.getPose()
         
         self.keyboard = ContinuousControlKeyboard()
         self.is_running = False
@@ -83,8 +87,8 @@ class ContKeyboardTeleopInterface:
                 self.right_arm_pose += right_arm_delta
                 self.left_arm.updateArmPose(self.left_arm_pose)
                 self.right_arm.updateArmPose(self.right_arm_pose)
-                self.left_arm.moveRobotiqGripper(left_gripper)
-                self.right_arm.moveRobotiqGripper(right_gripper)
+                # self.left_arm.moveRobotiqGripper(left_gripper)
+                # self.right_arm.moveRobotiqGripper(right_gripper)
                 sleep(0.004) # 250hz
 
     def stopTeleop(self):
