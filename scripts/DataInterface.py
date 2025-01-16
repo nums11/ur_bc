@@ -117,11 +117,6 @@ class DataInterface:
         for t in sorted_timesteps:
             print("Timestep", t)
             obs, action = trajectory[str(t)]
-            # print("Initial left arm j", obs['left_arm_j'])
-            # print("Initial left gripper", obs['left_gripper'])
-            # print("Initial action delta", action['left_arm_delta'])
-            # print("Initial action gripper", action['left_gripper'])
-
             if joint_position_replay:
                 left_action = obs['left_arm_j']
                 right_action = obs['right_arm_j']

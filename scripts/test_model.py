@@ -37,8 +37,7 @@ def armMovementThread(arm, joint_positions, gripper=None):
             gripper = True
             print("Should close gripper! --------")
         arm.moveRobotiqGripper(gripper)
-        if gripper == True:
-            print("Waiting for gripper to close")
+python examples/train_bc_rnn.py            print("Waiting for gripper to close")
             sleep(1)
 
 

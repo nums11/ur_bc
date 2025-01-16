@@ -87,8 +87,8 @@ class ContKeyboardTeleopInterface:
                 self.right_arm_pose += right_arm_delta
                 self.left_arm.updateArmPose(self.left_arm_pose)
                 self.right_arm.updateArmPose(self.right_arm_pose)
-                # self.left_arm.moveRobotiqGripper(left_gripper)
-                # self.right_arm.moveRobotiqGripper(right_gripper)
+                self.left_arm.moveRobotiqGripper(left_gripper)
+                self.right_arm.moveRobotiqGripper(right_gripper)
                 sleep(0.004) # 250hz
 
     def stopTeleop(self):
