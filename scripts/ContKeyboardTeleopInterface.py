@@ -21,7 +21,7 @@ class ContKeyboardTeleopInterface:
             #                                             4.154566166681737, -1.5883319440702799, 2.385492181115367])
         self.right_arm = URInterface(right_arm_ip, self.right_arm_start_joint__positions, has_robotiq_gripper=right_arm_has_gripper)
         self.left_arm = URInterface(left_arm_ip, self.left_arm_start_joint__positions, has_robotiq_gripper=left_arm_has_gripper,
-                            robotiq_gripper_port='/dev/ttyUSB2')
+                            robotiq_gripper_port='/dev/ttyUSB1')
         self.right_arm_pose = self.right_arm.getPose()
         self.left_arm_pose = self.left_arm.getPose()
         
@@ -87,8 +87,8 @@ class ContKeyboardTeleopInterface:
                 self.right_arm_pose += right_arm_delta
                 self.left_arm.updateArmPose(self.left_arm_pose)
                 self.right_arm.updateArmPose(self.right_arm_pose)
-                self.left_arm.moveRobotiqGripper(left_gripper)
-                self.right_arm.moveRobotiqGripper(right_gripper)
+                # self.left_arm.moveRobotiqGripper(left_gripper)
+                # self.right_arm.moveRobotiqGripper(right_gripper)
                 sleep(0.004) # 250hz
 
     def stopTeleop(self):
