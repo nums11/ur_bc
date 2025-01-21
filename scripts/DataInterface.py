@@ -4,6 +4,7 @@ from time import sleep
 import os
 import numpy as np
 import threading
+import cv2
 
 class DataInterface:
     def __init__(self, left_arm_start_joint__positions=None, right_arm_start_joint__positions=None):
@@ -122,6 +123,7 @@ class DataInterface:
                 right_action = obs['right_arm_j']
                 left_gripper = obs['left_gripper']
                 right_gripper = obs['right_gripper']
+                image = obs['image']
             else:
                 left_action = action['left_arm_delta']
                 right_action = action['right_arm_delta']
@@ -129,18 +131,21 @@ class DataInterface:
                 right_gripper = action['right_gripper']
                 print(left_action, left_gripper, right_action, right_gripper)
             left_arm_thread = threading.Thread(target=self.armMovementThread,
-                                            args=(self.teleop_interface.left_arm, left_action, joint_position_replay, left_gripper))
-            right_arm_thread = threading.Thread(target=self.armMovementThread,
-                                            args=(self.teleop_interface.right_arm, right_action, joint_position_replay, right_gripper))
-            right_arm_thread.start()
+                                            args=(self.teleop_interface.left_arm, left_action, image, joint_position_replay, left_gripper))
+            # right_arm_thread = threading.Thread(target=self.armMovementThread,
+            #                                 args=(self.teleop_interface.right_arm, right_action, joint_position_replay, right_gripper))
+            # right_arm_thread.start()
             left_arm_thread.start()
-            right_arm_thread.join()
+            # right_arm_thread.join()
             left_arm_thread.join()
 
-    def armMovementThread(self, arm, action, joint_position_replay=False, gripper=None):
+    def armMovementThread(self, arm, action, image=None, joint_position_replay=False, gripper=None):
         if joint_position_replay:
             # action is 6d joint position
             arm.movej(action)
+            if image is not None:
+                cv2.imwrite("/home/weirdlab/ur_bc/current_obs.jpg", image)
+
         else:
             # action is 6d ee position
             # action = np.zeros(6)

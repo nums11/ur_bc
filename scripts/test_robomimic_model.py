@@ -12,9 +12,13 @@ def convertTeleopObsToModelObs(obs):
     right_arm_j = obs['right_arm_j']
     left_obs_gripper = np.expand_dims(obs['left_gripper'], axis=0)
     right_obs_gripper = np.expand_dims(obs['right_gripper'], axis=0)
+    image = obs['image']
+    # Change image shape to have channels first
+    image = np.transpose(image, (2, 0, 1))
     # return np.concatenate((left_arm_j, left_obs_gripper, right_arm_j, right_obs_gripper))
     model_obs = {
-    'joint_and_gripper': np.concatenate((left_arm_j, left_obs_gripper))
+        'joint_and_gripper': np.concatenate((left_arm_j, left_obs_gripper)),
+        'images': image
     }
     return model_obs
 
@@ -46,7 +50,7 @@ def armMovementThread(arm, joint_positions, gripper=None):
         sleep(1)
 
 model, _ = policy_from_checkpoint(
-    ckpt_path="/home/weirdlab/ur_bc/scripts/robomimic/rm_bc_trained_models/test/20250116184351/models/model_epoch_100.pth")
+    ckpt_path="/home/weirdlab/ur_bc/scripts/robomimic/img_rm_bc_trained_models/test/20250117193907/models/model_epoch_100.pth")
 model.start_episode()
 
 teleop = ContKeyboardTeleopInterface()

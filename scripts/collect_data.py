@@ -1,10 +1,11 @@
 from DataInterface import DataInterface
 
 data_interface = DataInterface(
-    left_arm_start_joint__positions=tuple([0.0940, -1.5139,  2.1215,  3.8334, -1.4533,  2.2675])
+    left_arm_start_joint__positions=tuple([-0.09918270446100141, -1.5253831709203354, 2.1674539606378547,
+                                           4.03517106103823, -1.5213525784559918, 2.023743354909077])
 )
 # data_interface.startDataCollection(remove_zero_actions=True, collection_freq_hz=10)
-data_interface.replayTrajectory(traj_file_path='/home/weirdlab/ur_bc/data/traj_30.npz', joint_position_replay=True)
+data_interface.replayTrajectory(traj_file_path='/home/weirdlab/ur_bc/data/traj_18.npz', joint_position_replay=True)
 
 
 """

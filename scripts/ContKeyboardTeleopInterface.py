@@ -1,6 +1,7 @@
 from URnterface import URInterface
 from time import sleep
 from ContinuousControlKeyboard import ContinuousControlKeyboard
+from RSCameraInterface import RSCameraInterface
 import threading
 import numpy as np
 
@@ -24,12 +25,17 @@ class ContKeyboardTeleopInterface:
                             robotiq_gripper_port='/dev/ttyUSB1')
         self.right_arm_pose = self.right_arm.getPose()
         self.left_arm_pose = self.left_arm.getPose()
+        self.left_gripper = self.left_arm.getGripper()
+        self.right_gripper = self.right_arm.getGripper()
         
         self.keyboard = ContinuousControlKeyboard()
         self.is_running = False
         self.resetting = False
         self.last_observation = {}
         self.last_action = {}
+
+        self.rs_camera = RSCameraInterface()
+        self.rs_camera.startCapture()
 
         if reset_arms:
             self.resetArms()
@@ -44,6 +50,8 @@ class ContKeyboardTeleopInterface:
         # Send current pose to arms so that it won't jump when the programs are started
         self.right_arm_pose = self.right_arm.getPose()
         self.left_arm_pose = self.left_arm.getPose()
+        self.left_gripper = self.left_arm.getGripper()
+        self.right_gripper = self.right_arm.getGripper()
         for _ in range(10):
             self.right_arm.updateArmPose(self.right_arm_pose)
             self.left_arm.updateArmPose(self.left_arm_pose)
@@ -55,7 +63,9 @@ class ContKeyboardTeleopInterface:
 
     def startTeleop(self):
         self.teleop_thread = threading.Thread(target=self.teleopThread)
+        self.gripper_thread = threading.Thread(target=self.gripperThread)
         self.teleop_thread.start()
+        self.gripper_thread.start()
 
     def teleopThread(self):
         print("ContKeyboardTeleopInterface: Start UR Programs and Begin Teleoperation")
@@ -73,7 +83,8 @@ class ContKeyboardTeleopInterface:
                     'left_arm_j': self.left_arm.getj(),
                     'right_arm_j': self.right_arm.getj(),
                     'left_gripper': self.left_arm.getGripper(),
-                    'right_gripper': self.right_arm.getGripper()
+                    'right_gripper': self.right_arm.getGripper(),
+                    'image': self.rs_camera.getCurrentImage()
                 }
                 self.last_action = {
                     'left_arm_delta': left_arm_delta,
@@ -85,11 +96,19 @@ class ContKeyboardTeleopInterface:
                 # Apply deltas and grippers
                 self.left_arm_pose += left_arm_delta
                 self.right_arm_pose += right_arm_delta
+                self.left_gripper = left_gripper
+                self.right_gripper = right_gripper
                 self.left_arm.updateArmPose(self.left_arm_pose)
                 self.right_arm.updateArmPose(self.right_arm_pose)
-                # self.left_arm.moveRobotiqGripper(left_gripper)
-                # self.right_arm.moveRobotiqGripper(right_gripper)
                 sleep(0.004) # 250hz
+
+    def gripperThread(self):
+        while self.is_running:
+            if not self.resetting:
+                # self.left_arm.moveRobotiqGripper(self.left_gripper)
+                # self.right_arm.moveRobotiqGripper(self.right_gripper)
+                # sleep(0.004)
+                pass
 
     def stopTeleop(self):
         self.is_running = False

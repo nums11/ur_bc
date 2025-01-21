@@ -3,3 +3,6 @@
 *.npy
 *.npz
 data/*
+*.jpg
+*.png
+*.hdf5

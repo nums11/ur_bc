@@ -37,7 +37,7 @@
     },
     "train": {
         "data": null,
-        "output_dir": "../rm_bc_trained_models",
+        "output_dir": "../img_rm_bc_trained_models",
         "num_data_workers": 0,
         "hdf5_cache_mode": "all",
         "hdf5_use_swmr": true,
@@ -166,7 +166,9 @@
                 "low_dim": [
                     "joint_and_gripper"
                 ],
-                "rgb": [],
+                "rgb": [
+                    "images"
+                ],
                 "depth": [],
                 "scan": []
             },

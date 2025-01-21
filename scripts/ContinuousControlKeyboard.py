@@ -3,7 +3,7 @@ import numpy as np
 
 # Define keyboard control class
 class ContinuousControlKeyboard:
-    def __init__(self, translational_sensitivity=0.006, rotational_sensitivity=0.01):
+    def __init__(self, translational_sensitivity=0.0006, rotational_sensitivity=0.003):
         # Define the mappings between keys and their corresponding translational or
         # rotational deltas
         self.left_arm_key_to_delta_mappings = {

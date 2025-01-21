@@ -67,7 +67,6 @@ class URInterface:
 
     """ Moves gripper to position 0 (open) or 200 (closed) """
     def moveRobotiqGripper(self, close=True):
-        print("CLosing gripper", close)
         self.robotiq_gripper.moveRobotiqGripper(close)
 
     """ Get observation (joint pos, gripper) """
