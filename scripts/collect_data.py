@@ -1,17 +1,13 @@
-from DataInterface import DataInterface
+import sys
+import os
+# Add the root directory of the project to the path
+sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), '..')))
+from interfaces.DataCollectionInterface import DataCollectionInterface
 
-data_interface = DataInterface(
-    left_arm_start_joint__positions=tuple([-0.09918270446100141, -1.5253831709203354, 2.1674539606378547,
-                                           4.03517106103823, -1.5213525784559918, 2.023743354909077])
-)
-# data_interface.startDataCollection(remove_zero_actions=True, collection_freq_hz=10)
-data_interface.replayTrajectory(traj_file_path='/home/weirdlab/ur_bc/data/traj_18.npz', joint_position_replay=True)
-
-
-"""
-[0.09600820791777794, -1.9700557395947929, 2.2113284892461644, 4.1397435859649026,
--1.5766150033324582, 2.3817672802827907]
-False
-
-[ 0.1001, -1.9640,  2.1928,  4.1546, -1.5883,  2.3854,  0.0000]
-"""
+data_interface = DataCollectionInterface(
+    left_arm_start_joint__positions=tuple([0.019659894055907155, -1.5463554047150383, 2.1245277581273756,
+                                           4.016029281775736, -1.4222207118732229, 2.317571047171074]),
+    right_arm_start_joint__positions=tuple([-0.008423261080850786, -1.414431650807854, -2.2114553494555875,
+                                            -0.8639508269995134, -4.436137256425033, 3.3184844991744717]),
+    use_camera=False)
+data_interface.startDataCollection(remove_zero_actions=True, collection_freq_hz=10)

@@ -1,7 +1,7 @@
 from URnterface import URInterface
 from time import sleep
-from ContinuousControlKeyboard import ContinuousControlKeyboard
-from RSCameraInterface import RSCameraInterface
+from controllers.KeyboardController import ContinuousControlKeyboard
+from interfaces.RSCameraInterface import RSCameraInterface
 import threading
 import numpy as np
 

@@ -1,8 +1,7 @@
 from pynput.keyboard import Listener
 import numpy as np
 
-# Define keyboard control class
-class ContinuousControlKeyboard:
+class KeyboardController:
     def __init__(self, translational_sensitivity=0.0006, rotational_sensitivity=0.003):
         # Define the mappings between keys and their corresponding translational or
         # rotational deltas

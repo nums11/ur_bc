@@ -51,3 +51,6 @@ class RSCameraInterface:
             resized_image = cv2.resize(self.current_image, (256, 256))
             return resized_image
         return None
+    
+    def __del__(self):
+        self.stopCapture()

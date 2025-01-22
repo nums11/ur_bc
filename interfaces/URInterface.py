@@ -3,7 +3,7 @@ import pymodbus.client as ModbusClient
 from pymodbus.framer import Framer
 from pymodbus.payload import BinaryPayloadBuilder
 from pymodbus.constants import Endian
-from RobotiqGripperInterface import RobotiqGripperInterface
+from .RobotiqGripperInterface import RobotiqGripperInterface
 import numpy as np
 
 class URInterface:
