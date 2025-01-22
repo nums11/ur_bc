@@ -162,14 +162,14 @@ left_arm_modbus_client = ModbusClient.ModbusTcpClient(
 right_arm_modbus_client.connect()
 left_arm_modbus_client.connect()
 print("Initialized Modbus Clients")
-right_arm_start_joint__positions = tuple([-0.02262999405073174, -1.1830826636872513, -2.189683323644428,
+right_arm_start_joint_positions = tuple([-0.02262999405073174, -1.1830826636872513, -2.189683323644428,
                                         -1.095669650507004, -4.386985456001609, 3.2958897411425156])
-left_arm_start_joint__positions = tuple([0.10010272221997439, -1.313795512335239, 2.1921907366841067,
+left_arm_start_joint_positions = tuple([0.10010272221997439, -1.313795512335239, 2.1921907366841067,
                                          3.7562696849438524, 1.2427944188620925, 0.8873570727182682])
 print("Setting right arm to start position ----")
-right_arm.movej(right_arm_start_joint__positions)
+right_arm.movej(right_arm_start_joint_positions)
 print("Setting left arm to start position ----")
-left_arm.movej(left_arm_start_joint__positions)
+left_arm.movej(left_arm_start_joint_positions)
 
 print("Arms reset to start positions ------")
 sleep(1)

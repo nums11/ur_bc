@@ -23,7 +23,8 @@ class RobomimicDataInterface:
             traj_len = len(traj)
 
             processed_traj = {
-                'joint_ee': [],
+                'left_joint_and_gripper': [],
+                'right_joint_and_gripper': [],
                 'actions': []
             }
             if use_images:
@@ -36,18 +37,27 @@ class RobomimicDataInterface:
                 next_obs = traj[str(t+1)][0]
                 left_arm_j = np.array(obs['left_arm_j'])
                 left_obs_gripper = np.expand_dims(obs['left_gripper'] * 0.02, axis=0)
+                right_arm_j = np.array(obs['right_arm_j'])
+                right_obs_gripper = np.expand_dims(obs['right_gripper'] * 0.02, axis=0)
                 next_left_arm_j = np.array(next_obs['left_arm_j'])
                 next_left_obs_gripper = np.expand_dims(next_obs['left_gripper'] * 0.02, axis=0)
+                next_right_arm_j = np.array(next_obs['right_arm_j'])
+                next_right_obs_gripper = np.expand_dims(next_obs['right_gripper'] * 0.02, axis=0)
+
+                left_joint_delta = np.subtract(next_left_arm_j, left_arm_j)
+                right_joint_delta = np.subtract(next_right_arm_j, right_arm_j)
+
+                left_joint_and_gripper = np.concatenate((left_arm_j, left_obs_gripper))
+                right_joint_and_gripper = np.concatenate((right_arm_j, right_obs_gripper))
+                concat_action = np.concatenate((left_joint_delta, next_left_obs_gripper, right_joint_delta, next_right_obs_gripper))
+                processed_traj['left_joint_and_gripper'].append(left_joint_and_gripper)
+                processed_traj['right_joint_and_gripper'].append(right_joint_and_gripper)
+                processed_traj['actions'].append(concat_action)
+
                 if use_images:
                     image = obs['image']
-                joint_delta = np.subtract(next_left_arm_j, left_arm_j)
-
-                joint_ee = np.concatenate((left_arm_j, left_obs_gripper))
-                concat_action = np.concatenate((joint_delta, next_left_obs_gripper))
-                processed_traj['joint_ee'].append(joint_ee)
-                processed_traj['actions'].append(concat_action)
-                if use_images:
                     processed_traj['images'].append(image)
+
                 num_samples += 1
             processed_trajectories.append(processed_traj)
         return processed_trajectories, num_samples
@@ -66,9 +76,10 @@ class RobomimicDataInterface:
 
             for i, traj in enumerate(processed_trajectories):
                 traj_group = data_group.create_group('demo_' + str(i))
-                traj_group.attrs['num_samples'] = len(traj['joint_ee'])
+                traj_group.attrs['num_samples'] = len(traj['left_joint_and_gripper'])
                 traj_obs_group = traj_group.create_group('obs')
-                traj_obs_group.create_dataset('joint_and_gripper', data=traj['joint_ee'], dtype=np.float32)
+                traj_obs_group.create_dataset('left_joint_and_gripper', data=traj['left_joint_and_gripper'], dtype=np.float32)
+                traj_obs_group.create_dataset('right_joint_and_gripper', data=traj['right_joint_and_gripper'], dtype=np.float32)
                 if use_images:
                     traj_obs_group.create_dataset('images', data=traj['images'], dtype=np.uint8)
                 traj_group.create_dataset('actions', data=traj['actions'], dtype=np.float32)

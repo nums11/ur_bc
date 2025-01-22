@@ -5,7 +5,7 @@ import numpy as np
 
 class BimanualUREnv():
     def __init__(self, right_arm_ip='192.168.2.2', left_arm_ip='192.168.1.2', reset_arms=False,
-                    right_arm_start_joint__positions=None, left_arm_start_joint__positions=None,
+                    right_arm_start_joint_positions=None, left_arm_start_joint_positions=None,
                     robotiq_gripper_port='/dev/ttyUSB0'):
         print()
         # Initialize member variables
@@ -16,22 +16,22 @@ class BimanualUREnv():
         self.right_arm_action = None
         self.left_arm_action = None
         self.lock = threading.Lock()
-        if right_arm_start_joint__positions == None:
-            self.right_arm_start_joint__positions = tuple([-0.02262999405073174, -1.1830826636872513, -2.189683323644428,
+        if right_arm_start_joint_positions == None:
+            self.right_arm_start_joint_positions = tuple([-0.02262999405073174, -1.1830826636872513, -2.189683323644428,
                                         -1.095669650507004, -4.386985456001609, 3.2958897411425156])
         else:
-            self.right_arm_start_joint__positions = right_arm_start_joint__positions
-        if left_arm_start_joint__positions == None:
-            self.left_arm_start_joint__positions = tuple([0.1001404325810099, -1.9640431421070108, 2.192831819213297,
+            self.right_arm_start_joint_positions = right_arm_start_joint_positions
+        if left_arm_start_joint_positions == None:
+            self.left_arm_start_joint_positions = tuple([0.1001404325810099, -1.9640431421070108, 2.192831819213297,
                                                           4.154566166681737, -1.5883319440702799, 2.385492181115367])
         else:
-            self.left_arm_start_joint__positions = left_arm_start_joint__positions
+            self.left_arm_start_joint_positions = left_arm_start_joint_positions
 
         # Initialize UR Arms
         self.right_arm = URInterface(
-            self.right_arm_ip, self.right_arm_start_joint__positions, has_robotiq_gripper=True)
+            self.right_arm_ip, self.right_arm_start_joint_positions, has_robotiq_gripper=True)
         self.left_arm = URInterface(
-            self.left_arm_ip, self.left_arm_start_joint__positions, has_robotiq_gripper=True,
+            self.left_arm_ip, self.left_arm_start_joint_positions, has_robotiq_gripper=True,
             robotiq_gripper_port="/dev/ttyUSB2")
         print("BimanualUREnv: Initialized UR Interfaces")
         print()

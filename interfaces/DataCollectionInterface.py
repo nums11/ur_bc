@@ -6,10 +6,10 @@ import os
 import numpy as np
 
 class DataCollectionInterface:
-    def __init__(self, left_arm_start_joint__positions=None, right_arm_start_joint__positions=None, use_camera=False):
+    def __init__(self, left_arm_start_joint_positions=None, right_arm_start_joint_positions=None, use_camera=False):
         self.teleop = KeyboardTeleopInterface(
-            left_arm_start_joint__positions=left_arm_start_joint__positions,
-            right_arm_start_joint__positions=right_arm_start_joint__positions,
+            left_arm_start_joint_positions=left_arm_start_joint_positions,
+            right_arm_start_joint_positions=right_arm_start_joint_positions,
             use_camera=use_camera)
 
         # Start the pynput keyboard listener
@@ -91,8 +91,8 @@ class DataCollectionInterface:
             next_t = t + 1
             while next_t < traj_len:
                 next_obs = trajectory[str(next_t)]
-                if (np.array_equal(current_obs[0]['left_arm_j'], next_obs[0]['left_arm_j']) and
-                    np.array_equal(current_obs[0]['right_arm_j'], next_obs[0]['right_arm_j']) and
+                if (np.linalg.norm(current_obs[0]['left_arm_j'] - next_obs[0]['left_arm_j']) <= 1e-4 and
+                    np.linalg.norm(current_obs[0]['right_arm_j'] - next_obs[0]['right_arm_j']) <= 1e-4 and
                     current_obs[0]['left_gripper'] == 0 and next_obs[0]['left_gripper'] == 0 and
                     current_obs[0]['right_gripper'] == 0 and next_obs[0]['right_gripper'] == 0):
                     next_t += 1

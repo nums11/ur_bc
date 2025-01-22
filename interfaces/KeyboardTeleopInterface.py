@@ -5,11 +5,11 @@ from time import sleep
 import threading
 
 class KeyboardTeleopInterface:
-    def __init__(self, left_arm_start_joint__positions=None, right_arm_start_joint__positions=None,
+    def __init__(self, left_arm_start_joint_positions=None, right_arm_start_joint_positions=None,
                  use_camera=False):
         # Initialize the interface
-        self.bimanual_ur_env = BimanualUREnv(left_arm_start_joint__positions=left_arm_start_joint__positions,
-                                             right_arm_start_joint__positions=right_arm_start_joint__positions,
+        self.bimanual_ur_env = BimanualUREnv(left_arm_start_joint_positions=left_arm_start_joint_positions,
+                                             right_arm_start_joint_positions=right_arm_start_joint_positions,
                                              use_camera=use_camera)
         self.keyboard_controller = KeyboardController()
         self.resetting = False
@@ -55,6 +55,7 @@ class KeyboardTeleopInterface:
     def reset(self):
         self.resetting = True
         self.obs = self.bimanual_ur_env.reset()
+        self.keyboard_controller.resetGripperValues()
         self.resetting = False
 
     def getObservation(self):

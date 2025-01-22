@@ -45,10 +45,10 @@ class URInterface:
 
     """ Get arm pose using urx """
     def getPose(self):
-        return self.arm.get_pose_array()
+        return np.array(self.arm.get_pose_array())
     
     def getj(self):
-        return self.arm.getj()
+        return np.array(self.arm.getj())
 
     def getGripper(self):
         return self.robotiq_gripper.getGripperStatus()
@@ -80,7 +80,11 @@ class URInterface:
     def resetPosition(self):
         print("URInterface: Resetting Arm at IP", self.ip, "to start position")
         self.arm.movej(self.start_joint_positions)
+        print("URInterface: Finished Resetting Arm at IP", self.ip, "to start position")
         if self.has_robotiq_gripper:
             self.robotiq_gripper.resetPosition()
-        print("URInterface: Finished Resetting Arm at IP", self.ip, "to start position")
+            # Wait until the gripper is open
+            while self.robotiq_gripper.getGripperPosition() > 10:
+                continue
+        print("URInterface: Finished resetting Robotiq 3f Gripper to start position")
         

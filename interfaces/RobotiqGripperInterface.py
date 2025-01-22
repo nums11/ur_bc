@@ -26,9 +26,11 @@ class RobotiqGripperInterface:
     def getGripperStatus(self):
         return self.gripper_closed
     
+    def getGripperPosition(self):
+        return self.robotiq_gripper.status().position.po
+    
     """ Reset to start position (open)"""
     def resetPosition(self):
         print("RobotiqGripperInterface: Resetting Robotiq 3f Gripper to start position")
         self.moveRobotiqGripper(close=False)
         self.gripper_closed = False
-        print("RobotiqGripperInterface: Finished resetting Robotiq 3f Gripper to start position")
