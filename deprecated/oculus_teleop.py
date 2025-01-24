@@ -1,5 +1,5 @@
-from OculusTeleopInterface import OculusTeleopInterface
-from BimanualUREnv import BimanualUREnv
+from deprecated.OculusTeleopInterface import OculusTeleopInterface
+from deprecated.OldBimanualUREnv import BimanualUREnv
 from time import sleep, time
 import numpy as np
 

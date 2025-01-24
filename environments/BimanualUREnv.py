@@ -72,8 +72,8 @@ class BimanualUREnv:
         return self._getObservation()
     
     def _stepEE(self, action):
-        self.left_arm_pose = action['left_arm_pose']
-        self.right_arm_pose = action['right_arm_pose']
+        self.left_arm_pose = self._limitWorkspace(action['left_arm_pose'])
+        self.right_arm_pose = self._limitWorkspace(action['right_arm_pose'], is_right_arm=True)
         self.left_gripper = action['left_gripper']
         self.right_gripper = action['right_gripper']
     
@@ -123,6 +123,15 @@ class BimanualUREnv:
         if self.use_camera:
             obs['image'] = self.rs_camera.getCurrentImage()
         return obs
+    
+    def _limitWorkspace(self, pose, is_right_arm=False):
+        if is_right_arm and pose[2] < 0.21:
+            pose[2] = 0.21
+        elif not is_right_arm and pose[2] < 0.16:
+            pose[2] = 0.16
+        elif pose[2] > 0.55:
+            pose[2] = 0.55
+        return pose
 
     def render(self):
         pass

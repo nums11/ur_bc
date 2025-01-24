@@ -1,4 +1,4 @@
-from scripts.OldContKeyboardTeleopInterface import ContKeyboardTeleopInterface
+from deprecated.OldContKeyboardTeleopInterface import ContKeyboardTeleopInterface
 import torch
 from torch import nn
 import numpy as np

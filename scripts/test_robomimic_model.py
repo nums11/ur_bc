@@ -1,4 +1,4 @@
-from scripts.OldContKeyboardTeleopInterface import ContKeyboardTeleopInterface
+from deprecated.OldContKeyboardTeleopInterface import ContKeyboardTeleopInterface
 import sys
 sys.path.append("/home/weirdlab/ur_bc/scripts/robomimic")
 

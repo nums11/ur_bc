@@ -14,31 +14,32 @@ def moveArm(action):
     else:
         robot = right_arm
     pose = robot.get_pose_array()
+    move_inc = 0.01
     if action == 0:
-        pose[0] -= 0.02
+        pose[0] -= move_inc
     elif action == 1:
-        pose[0] += 0.02
+        pose[0] += move_inc
     elif action == 2:
-        pose[1] += 0.02
+        pose[1] += move_inc
     elif action == 3:
-        pose[1] -= 0.02
+        pose[1] -= move_inc
     elif action == 4:
-        pose[2] += 0.02
+        pose[2] += move_inc
     elif action == 5:
-        pose[2] -= 0.02
+        pose[2] -= move_inc
     elif action == 6:
-        pose[0] += 0.02
+        pose[0] += move_inc
     elif action == 7:
-        pose[0] -= 0.02
+        pose[0] -= move_inc
     elif action == 8:
-        pose[1] -= 0.02
+        pose[1] -= move_inc
     elif action == 9:
-        pose[1] += 0.02
+        pose[1] += move_inc
     elif action == 10:
-        pose[2] += 0.02
+        pose[2] += move_inc
     elif action == 11:
-        pose[2] -= 0.02
-    robot.movejInvKin(pose)
+        pose[2] -= move_inc
+    robot.servojInvKin(pose)
 
 def on_press(key):
     if not hasattr(key, 'char'):
