@@ -8,7 +8,7 @@ import numpy as np
 class ContKeyboardTeleopInterface:
     def __init__(self, right_arm_ip='192.168.2.2', left_arm_ip='192.168.1.2', reset_arms=True,
                  right_arm_start_joint_positions=None, left_arm_start_joint_positions=None,
-                 right_arm_has_gripper=True, left_arm_has_gripper=True):
+                 right_arm_has__3f_gripper=True, left_arm_has_3f_gripper=True):
         
         self.right_arm_start_joint_positions = right_arm_start_joint_positions
         if right_arm_start_joint_positions == None:
@@ -20,8 +20,8 @@ class ContKeyboardTeleopInterface:
                                                 4.267360912521422, -1.4365121397580038, 2.3399834772053114])
             # self.left_arm_start_joint_positions = tuple([0.1001404325810099, -1.9640431421070108, 2.192831819213297,
             #                                             4.154566166681737, -1.5883319440702799, 2.385492181115367])
-        self.right_arm = URInterface(right_arm_ip, self.right_arm_start_joint_positions, has_robotiq_gripper=right_arm_has_gripper)
-        self.left_arm = URInterface(left_arm_ip, self.left_arm_start_joint_positions, has_robotiq_gripper=left_arm_has_gripper,
+        self.right_arm = URInterface(right_arm_ip, self.right_arm_start_joint_positions, has_3f_gripper=right_arm_has__3f_gripper)
+        self.left_arm = URInterface(left_arm_ip, self.left_arm_start_joint_positions, has_3f_gripper=left_arm_has_3f_gripper,
                             robotiq_gripper_port='/dev/ttyUSB1')
         self.right_arm_pose = self.right_arm.getPose()
         self.left_arm_pose = self.left_arm.getPose()

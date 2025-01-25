@@ -12,10 +12,10 @@ class KeyboardController:
             'd': np.asarray([0.0, 1.0, 0.0]) * translational_sensitivity,
             'q': np.asarray([0.0, 0.0, 1.0]) * translational_sensitivity,
             'e': np.asarray([0.0, 0.0, -1.0]) * translational_sensitivity,
-            'r': np.asarray([0.0, 0.0, 1.0]) * rotational_sensitivity,
-            'f': np.asarray([0.0, 0.0, -1.0]) * rotational_sensitivity,
-            'z': np.asarray([-1.0, 0.0, 0.0]) * rotational_sensitivity,
-            'x': np.asarray([1.0, 0.0, 0.0]) * rotational_sensitivity,
+            'z': np.asarray([0.0, 0.0, 1.0]) * rotational_sensitivity,
+            'x': np.asarray([0.0, 0.0, -1.0]) * rotational_sensitivity,
+            'r': np.asarray([-1.0, 0.0, 0.0]) * rotational_sensitivity,
+            'f': np.asarray([1.0, 0.0, 0.0]) * rotational_sensitivity,
         }
         self.right_arm_key_to_delta_mappings = {
             'i': np.asarray([1.0, 0.0, 0.0]) * translational_sensitivity,

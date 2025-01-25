@@ -6,10 +6,12 @@ import threading
 
 class KeyboardTeleopInterface:
     def __init__(self, left_arm_start_joint_positions=None, right_arm_start_joint_positions=None,
+                 left_arm_has_3f_gripper=True, right_arm_has__3f_gripper=True,
                  use_camera=False):
         # Initialize the interface
         self.bimanual_ur_env = BimanualUREnv(left_arm_start_joint_positions=left_arm_start_joint_positions,
                                              right_arm_start_joint_positions=right_arm_start_joint_positions,
+                                             left_arm_has_3f_gripper=True, right_arm_has__3f_gripper=True,
                                              use_camera=use_camera)
         self.keyboard_controller = KeyboardController()
         self.resetting = False

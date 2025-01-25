@@ -3,15 +3,16 @@ import pymodbus.client as ModbusClient
 from pymodbus.framer import Framer
 from pymodbus.payload import BinaryPayloadBuilder
 from pymodbus.constants import Endian
-from .RobotiqGripperInterface import RobotiqGripperInterface
+from .Robotiq3fGripperInterface import Robotiq3fGripperInterface
+from .Robotiq2f85Interface import Robotiq2f85Interface
 import numpy as np
 
 class URInterface:
-    def __init__(self, ip, start_joint_positions, has_robotiq_gripper=False, robotiq_gripper_port='/dev/ttyUSB0'):
+    def __init__(self, ip, start_joint_positions, has_3f_gripper=False, robotiq_gripper_port='/dev/ttyUSB0'):
         # Initialize member variables
         self.ip = ip
         self.start_joint_positions = start_joint_positions
-        self.has_robotiq_gripper = has_robotiq_gripper
+        self.has_3f_gripper = has_3f_gripper
         self.robotiq_gripper_port = robotiq_gripper_port
 
         # Initialize URX connection
@@ -28,8 +29,10 @@ class URInterface:
         print("URInterface: Initialized Modbus Connection To IP", self.ip)
 
         # Initialize Robotiq 3f Gripper
-        if self.has_robotiq_gripper:
-            self.robotiq_gripper = RobotiqGripperInterface(port=self.robotiq_gripper_port)
+        if self.has_3f_gripper:
+            self.robotiq_gripper = Robotiq3fGripperInterface(port=self.robotiq_gripper_port)
+        else: 
+            self.robotiq_gripper = Robotiq2f85Interface()
 
     """ Send a movej command using urx """
     def movej(self, joint_positions):
@@ -71,7 +74,7 @@ class URInterface:
 
     """ Get observation (joint pos, gripper) """
     def getObservation(self):
-        if self.has_robotiq_gripper:
+        if self.has_3f_gripper:
             return (self.arm.getj(), self.robotiq_gripper.getGripperStatus())
         else:
             return self.arm.getj()
@@ -81,10 +84,10 @@ class URInterface:
         print("URInterface: Resetting Arm at IP", self.ip, "to start position")
         self.arm.movej(self.start_joint_positions)
         print("URInterface: Finished Resetting Arm at IP", self.ip, "to start position")
-        if self.has_robotiq_gripper:
+        if self.has_3f_gripper:
             self.robotiq_gripper.resetPosition()
             # Wait until the gripper is open
             while self.robotiq_gripper.getGripperPosition() > 10:
                 continue
-        print("URInterface: Finished resetting Robotiq 3f Gripper to start position")
+        print("URInterface: Finished resetting Robotiq Gripper to start position")
         

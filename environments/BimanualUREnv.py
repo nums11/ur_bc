@@ -6,7 +6,7 @@ from time import sleep
 class BimanualUREnv:
     def __init__(self, ee_actions=True, right_arm_ip='192.168.2.2', left_arm_ip='192.168.1.2',
                  right_arm_start_joint_positions=None, left_arm_start_joint_positions=None,
-                 right_arm_has_gripper=True, left_arm_has_gripper=True, use_camera=False):
+                 right_arm_has__3f_gripper=True, left_arm_has_3f_gripper=True, use_camera=False):
         
         self.right_arm_start_joint_positions = right_arm_start_joint_positions
         if right_arm_start_joint_positions == None:
@@ -17,9 +17,9 @@ class BimanualUREnv:
             self.left_arm_start_joint_positions = tuple([0.04474830963143529, -1.6422924423175793, 1.9634950313912025,
                                                 4.267360912521422, -1.4365121397580038, 2.3399834772053114])
             
-        self.right_arm = URInterface(right_arm_ip, self.right_arm_start_joint_positions, has_robotiq_gripper=right_arm_has_gripper,
-                                     robotiq_gripper_port='/dev/ttyUSB2')
-        self.left_arm = URInterface(left_arm_ip, self.left_arm_start_joint_positions, has_robotiq_gripper=left_arm_has_gripper,
+        self.right_arm = URInterface(right_arm_ip, self.right_arm_start_joint_positions, has_3f_gripper=right_arm_has__3f_gripper,
+                                     robotiq_gripper_port='/dev/ttyUSB0')
+        self.left_arm = URInterface(left_arm_ip, self.left_arm_start_joint_positions, has_3f_gripper=left_arm_has_3f_gripper,
                                     robotiq_gripper_port='/dev/ttyUSB1')
         self.right_arm_pose = self.right_arm.getPose()
         self.left_arm_pose = self.left_arm.getPose()
@@ -127,8 +127,8 @@ class BimanualUREnv:
     def _limitWorkspace(self, pose, is_right_arm=False):
         if is_right_arm and pose[2] < 0.21:
             pose[2] = 0.21
-        elif not is_right_arm and pose[2] < 0.16:
-            pose[2] = 0.16
+        elif not is_right_arm and pose[2] < 0.08:
+            pose[2] = 0.08
         elif pose[2] > 0.55:
             pose[2] = 0.55
         return pose

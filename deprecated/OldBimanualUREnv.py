@@ -29,9 +29,9 @@ class BimanualUREnv():
 
         # Initialize UR Arms
         self.right_arm = URInterface(
-            self.right_arm_ip, self.right_arm_start_joint_positions, has_robotiq_gripper=True)
+            self.right_arm_ip, self.right_arm_start_joint_positions, has_3f_gripper=True)
         self.left_arm = URInterface(
-            self.left_arm_ip, self.left_arm_start_joint_positions, has_robotiq_gripper=True,
+            self.left_arm_ip, self.left_arm_start_joint_positions, has_3f_gripper=True,
             robotiq_gripper_port="/dev/ttyUSB2")
         print("BimanualUREnv: Initialized UR Interfaces")
         print()

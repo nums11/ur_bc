@@ -1,6 +1,6 @@
 from robotiq_modbus_controller.driver import RobotiqModbusRtuDriver
 
-class RobotiqGripperInterface:
+class Robotiq3fGripperInterface:
     def __init__(self, port='/dev/ttyUSB0'):
         # Initialize member variables
         self.port = port
@@ -10,7 +10,7 @@ class RobotiqGripperInterface:
         self.robotiq_gripper = RobotiqModbusRtuDriver(self.port)
         self.robotiq_gripper.connect()
         self.robotiq_gripper.activate()
-        print("RobotiqGripperInterface: Initialized Robotiq 3f Gripper at port", self.port)
+        print("Robotiq3fGripperInterface: Initialized Robotiq 3f Gripper at port", self.port)
 
     """ Moves gripper to position 0 (open) or 200 (closed) """
     def moveRobotiqGripper(self, close=True):
@@ -31,6 +31,6 @@ class RobotiqGripperInterface:
     
     """ Reset to start position (open)"""
     def resetPosition(self):
-        print("RobotiqGripperInterface: Resetting Robotiq 3f Gripper to start position")
+        print("Robotiq3fGripperInterface: Resetting Robotiq 3f Gripper to start position")
         self.moveRobotiqGripper(close=False)
         self.gripper_closed = False
