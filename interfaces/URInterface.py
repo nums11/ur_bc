@@ -31,7 +31,7 @@ class URInterface:
         # Initialize Robotiq 3f Gripper
         if self.has_3f_gripper:
             self.robotiq_gripper = Robotiq3fGripperInterface(port=self.robotiq_gripper_port)
-        else: 
+        else:
             self.robotiq_gripper = Robotiq2f85Interface()
 
     """ Send a movej command using urx """

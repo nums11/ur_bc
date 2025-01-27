@@ -11,7 +11,8 @@ class KeyboardTeleopInterface:
         # Initialize the interface
         self.bimanual_ur_env = BimanualUREnv(left_arm_start_joint_positions=left_arm_start_joint_positions,
                                              right_arm_start_joint_positions=right_arm_start_joint_positions,
-                                             left_arm_has_3f_gripper=True, right_arm_has__3f_gripper=True,
+                                             left_arm_has_3f_gripper=left_arm_has_3f_gripper,
+                                             right_arm_has__3f_gripper=right_arm_has__3f_gripper,
                                              use_camera=use_camera)
         self.keyboard_controller = KeyboardController()
         self.resetting = False

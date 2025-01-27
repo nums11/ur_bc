@@ -32,9 +32,11 @@ class BimanualUREnv:
         self.ee_actions = ee_actions
         if self.ee_actions:
             self.arm_thread = threading.Thread(target=self._armEEThread)
-            self.gripper_thread = threading.Thread(target=self._gripperThread)
+            self.left_gripper_thread = threading.Thread(target=self._gripperThread, args=(False,))
+            self.right_gripper_thread = threading.Thread(target=self._gripperThread, args=(True,))
             self.arm_thread.start()
-            self.gripper_thread.start()
+            self.left_gripper_thread.start()
+            self.right_gripper_thread.start()
 
         self.use_camera = use_camera
         if self.use_camera:
@@ -102,11 +104,13 @@ class BimanualUREnv:
                 self.right_arm.updateArmPose(self.right_arm_pose)
                 sleep(0.004)
         
-    def _gripperThread(self):
+    def _gripperThread(self, is_right_arm):
         while True:
             if not self.resetting:
-                self.left_arm.moveRobotiqGripper(self.left_gripper)
-                self.right_arm.moveRobotiqGripper(self.right_gripper)
+                if is_right_arm:
+                    self.right_arm.moveRobotiqGripper(self.right_gripper)
+                else:
+                    self.left_arm.moveRobotiqGripper(self.left_gripper)
                 sleep(0.004)
 
     def _getObservation(self):
