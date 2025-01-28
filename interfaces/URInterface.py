@@ -35,8 +35,8 @@ class URInterface:
             self.robotiq_gripper = Robotiq2f85Interface()
 
     """ Send a movej command using urx """
-    def movej(self, joint_positions):
-        self.arm.movej(joint_positions, vel=0.5)
+    def movej(self, joint_positions, blocking=False):
+        self.arm.movej(joint_positions, vel=0.5, wait=blocking)
 
     """ Send a movej(get_inverse_kin) command using urx """
     def movejInvKin(self, joint_positions):
@@ -84,10 +84,9 @@ class URInterface:
         print("URInterface: Resetting Arm at IP", self.ip, "to start position")
         self.arm.movej(self.start_joint_positions)
         print("URInterface: Finished Resetting Arm at IP", self.ip, "to start position")
-        if self.has_3f_gripper:
-            self.robotiq_gripper.resetPosition()
-            # Wait until the gripper is open
-            while self.robotiq_gripper.getGripperPosition() > 10:
-                continue
+        self.robotiq_gripper.resetPosition()
+        # Wait until the gripper is open
+        while self.robotiq_gripper.getGripperPosition() > 10:
+            continue
         print("URInterface: Finished resetting Robotiq Gripper to start position")
         

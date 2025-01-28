@@ -1,20 +1,16 @@
-from .KeyboardTeleopInterface import KeyboardTeleopInterface
 from pynput.keyboard import Listener
 from time import sleep
 from environments.BimanualUREnv import BimanualUREnv
+from environments.UREnv import UREnv
 import os
 import numpy as np
 
 class DataCollectionInterface:
-    def __init__(self, left_arm_start_joint_positions=None, right_arm_start_joint_positions=None, use_camera=False):
-        self.teleop = KeyboardTeleopInterface(
-            left_arm_start_joint_positions=left_arm_start_joint_positions,
-            right_arm_start_joint_positions=right_arm_start_joint_positions,
-            use_camera=use_camera)
-
+    def __init__(self, teleop_interface):
+        self.teleop_interface = teleop_interface
         # Start the pynput keyboard listener
         self.keyboard_listener = Listener(
-            on_release=self.on_release
+            on_release=self._on_release
         )
 
         print("Initialized DataInterface")
@@ -22,9 +18,9 @@ class DataCollectionInterface:
     def startDataCollection(self, collection_freq_hz=30, remove_zero_actions=False):
         print("DataInterface collection frequency:", collection_freq_hz, "hz")
         self.keyboard_listener.start()
-        self.teleop.start()
+        self.teleop_interface.start()
         # wait for teleop to start
-        while self.teleop.resetting:
+        while self.teleop_interface.resetting:
             continue
 
         self.collecting = False
@@ -33,7 +29,7 @@ class DataCollectionInterface:
         collection_sleep = 1 / collection_freq_hz
         t = 0
         trajectory = {}
-        self.printCollectionMessage()
+        self._printCollectionMessage()
         while True:
             if self.collecting:
                 if self.discard or self.save:
@@ -41,26 +37,26 @@ class DataCollectionInterface:
                         print("Discarding Trajectory ---\n")
                     else:
                         print("Saving Trajectory ---\n")
-                        self.saveTrajectory(trajectory, remove_zero_actions)
+                        self._saveTrajectory(trajectory, remove_zero_actions)
                     t = 0
                     trajectory = {}
                     self.collecting = False
                     self.discard = False
                     self.save = False
-                    self.teleop.reset()
-                    self.printCollectionMessage()
+                    self.teleop_interface.reset()
+                    self._printCollectionMessage()
                     continue
 
-                obs = self.teleop.getObservation()
+                obs = self.teleop_interface.getObservation()
                 trajectory[str(t)] = [obs]
                 print("t", t, "obs", obs)
                 t += 1
                 sleep(collection_sleep)
 
-    def printCollectionMessage(self):
+    def _printCollectionMessage(self):
         print("Press '1' to begin data collection, '2' to discard trajectory, '3' to save trajectory")
         
-    def on_release(self, key):
+    def _on_release(self, key):
         if not hasattr(key, 'char'):
             return
         # Start collecting
@@ -75,14 +71,14 @@ class DataCollectionInterface:
                 self.save = True
 
     """ Get the new filename based on the number of existing trajectories """
-    def getDatasetFilename(self):
+    def _getDatasetFilename(self):
         data_base_dir = '/home/weirdlab/ur_bc/data/'
         num_trajectories = len(os.listdir(data_base_dir))
         filename = data_base_dir + 'traj_' + str(num_trajectories) + '.npz'
         return filename
     
     """ Remove Zero actions from a trajectory"""
-    def removeZeroActions(self, trajectory):
+    def _removeZeroActions(self, trajectory):
         traj_len = len(trajectory)
         num_zero_actions = 0
         t = 0
@@ -91,10 +87,7 @@ class DataCollectionInterface:
             next_t = t + 1
             while next_t < traj_len:
                 next_obs = trajectory[str(next_t)]
-                if (np.linalg.norm(current_obs[0]['left_arm_j'] - next_obs[0]['left_arm_j']) <= 1e-4 and
-                    np.linalg.norm(current_obs[0]['right_arm_j'] - next_obs[0]['right_arm_j']) <= 1e-4 and
-                    current_obs[0]['left_gripper'] == 0 and next_obs[0]['left_gripper'] == 0 and
-                    current_obs[0]['right_gripper'] == 0 and next_obs[0]['right_gripper'] == 0):
+                if self._isZeroAction(current_obs, next_obs):
                     next_t += 1
                 else:
                     break
@@ -109,11 +102,21 @@ class DataCollectionInterface:
             t += 1
         return trajectory, num_zero_actions
     
-    def saveTrajectory(self, trajectory, remove_zero_actions):
-        filename = self.getDatasetFilename()
+    def _isZeroAction(self, current_obs, next_obs):
+        if type(self.teleop_interface.env) == BimanualUREnv:
+            return (np.linalg.norm(current_obs[0]['left_arm_pose'] - next_obs[0]['left_arm_pose']) <= 1e-4 and
+                    np.linalg.norm(current_obs[0]['right_arm_pose'] - next_obs[0]['right_arm_pose']) <= 1e-4 and
+                    current_obs[0]['left_gripper'] == 0 and next_obs[0]['left_gripper'] == 0 and
+                    current_obs[0]['right_gripper'] == 0 and next_obs[0]['right_gripper'] == 0)
+        elif type(self.teleop_interface.env) == UREnv:
+            return (np.linalg.norm(current_obs[0]['arm_pose'] - next_obs[0]['arm_pose']) <= 1e-4 and
+                    current_obs[0]['gripper'] == 0 and next_obs[0]['gripper'] == 0)
+    
+    def _saveTrajectory(self, trajectory, remove_zero_actions):
+        filename = self._getDatasetFilename()
         if remove_zero_actions:
             print("DataInterface: Removing Zero actions before saving trajectory")
-            trajectory, num_zero_actions = self.removeZeroActions(trajectory)
+            trajectory, num_zero_actions = self._removeZeroActions(trajectory)
             print("DataInterface: Removed", num_zero_actions, "actions from trajectory")
         print("DataInterface: Saving trajectory to path", filename)
         np.savez(filename, **trajectory)

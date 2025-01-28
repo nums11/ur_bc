@@ -1,3 +1,4 @@
+from .UREnv import UREnv
 from interfaces.URInterface import URInterface
 from interfaces.RSCameraInterface import RSCameraInterface
 import threading
@@ -8,137 +9,70 @@ class BimanualUREnv:
                  right_arm_start_joint_positions=None, left_arm_start_joint_positions=None,
                  right_arm_has__3f_gripper=True, left_arm_has_3f_gripper=True, use_camera=False):
         
-        self.right_arm_start_joint_positions = right_arm_start_joint_positions
         if right_arm_start_joint_positions == None:
-            self.right_arm_start_joint_positions = tuple([-0.02262999405073174, -1.1830826636872513, -2.189683323644428,
+            right_arm_start_joint_positions = tuple([-0.02262999405073174, -1.1830826636872513, -2.189683323644428,
                                                 -1.095669650507004, -4.386985456001609, 3.2958897411425156])
-        self.left_arm_start_joint_positions = left_arm_start_joint_positions
         if left_arm_start_joint_positions == None:
-            self.left_arm_start_joint_positions = tuple([0.04474830963143529, -1.6422924423175793, 1.9634950313912025,
+            left_arm_start_joint_positions = tuple([0.04474830963143529, -1.6422924423175793, 1.9634950313912025,
                                                 4.267360912521422, -1.4365121397580038, 2.3399834772053114])
-            
-        self.right_arm = URInterface(right_arm_ip, self.right_arm_start_joint_positions, has_3f_gripper=right_arm_has__3f_gripper,
-                                     robotiq_gripper_port='/dev/ttyUSB0')
-        self.left_arm = URInterface(left_arm_ip, self.left_arm_start_joint_positions, has_3f_gripper=left_arm_has_3f_gripper,
-                                    robotiq_gripper_port='/dev/ttyUSB1')
-        self.right_arm_pose = self.right_arm.getPose()
-        self.left_arm_pose = self.left_arm.getPose()
-        self.left_gripper = self.left_arm.getGripper()
-        self.right_gripper = self.right_arm.getGripper()
-
-        self.resetting = False
-        self.last_observation = {}
-
+        
         self.ee_actions = ee_actions
-        if self.ee_actions:
-            self.arm_thread = threading.Thread(target=self._armEEThread)
-            self.left_gripper_thread = threading.Thread(target=self._gripperThread, args=(False,))
-            self.right_gripper_thread = threading.Thread(target=self._gripperThread, args=(True,))
-            self.arm_thread.start()
-            self.left_gripper_thread.start()
-            self.right_gripper_thread.start()
-
-        self.use_camera = use_camera
-        if self.use_camera:
-            self.rs_camera = RSCameraInterface()
-            self.rs_camera.startCapture()
+        self.right_arm_env = UREnv(arm_ip=right_arm_ip, has_3f_gripper=right_arm_has__3f_gripper, use_camera=use_camera,
+            start_joint_positions=right_arm_start_joint_positions, robotiq_gripper_port='/dev/ttyUSB0', ee_actions=ee_actions)
+        self.left_arm_env = UREnv(arm_ip=left_arm_ip, has_3f_gripper=left_arm_has_3f_gripper, use_camera=False,
+            start_joint_positions=left_arm_start_joint_positions, robotiq_gripper_port='/dev/ttyUSB1', ee_actions=ee_actions)
 
         print("Initialized BimanualUREnv")
 
     def reset(self):
         print("BimanualUREnv: Resetting")
-        self.resetting = True
-        self.right_arm.resetPosition()
-        self.left_arm.resetPosition()
-        # Send current pose to arms so that it won't jump when the programs are started
-        if self.ee_actions:
-            self.left_arm_pose = self.left_arm.getPose()
-            self.right_arm_pose = self.right_arm.getPose()
-            self.left_gripper = self.left_arm.getGripper()
-            self.right_gripper = self.right_arm.getGripper()
-            for _ in range(10):
-                self.left_arm.updateArmPose(self.left_arm_pose)
-                self.right_arm.updateArmPose(self.right_arm_pose)
-        # Makes sure the keyboard knows that the grippers are open since the
-        # arm was reset
-        # self.keyboard.resetGripperValues()
-        self.resetting = False
+        self.right_arm_env.reset()
+        self.left_arm_env.reset()
         print("BimanualUREnv: Finished Resetting. Start UR Programs")
         return self._getObservation()
 
-    def step(self, action):
+    def step(self, action, blocking=True):
         if self.ee_actions:
             self._stepEE(action)
         else:
-            self._stepJoints(action)
+            self._stepJoints(action, blocking)
         return self._getObservation()
     
     def _stepEE(self, action):
-        self.left_arm_pose = self._limitWorkspace(action['left_arm_pose'])
-        self.right_arm_pose = self._limitWorkspace(action['right_arm_pose'], is_right_arm=True)
-        self.left_gripper = action['left_gripper']
-        self.right_gripper = action['right_gripper']
+        left_arm_action = {
+            'arm_pose': action['left_arm_pose'],
+            'gripper': action['left_gripper']
+        }
+        right_arm_action = {
+            'arm_pose': action['right_arm_pose'],
+            'gripper': action['right_gripper']
+        }
+        self.left_arm_env.step(left_arm_action)
+        self.right_arm_env.step(right_arm_action)
     
-    def _stepJoints(self, action):
-        left_arm_j = action['left_arm_j']
-        left_gripper = action['left_gripper']
-        right_arm_j = action['right_arm_j']
-        right_gripper = action['right_gripper']
-        left_arm_thread = threading.Thread(target=self._armJThread,
-                                            args=(self.left_arm, left_arm_j, left_gripper))
-        right_arm_thread = threading.Thread(target=self._armJThread,
-                                            args=(self.right_arm, right_arm_j, right_gripper))
-        left_arm_thread.start()
-        right_arm_thread.start()
-        left_arm_thread.join()
-        right_arm_thread.join()
-
-    def _armJThread(self, arm, joint_postiions, gripper):
-        arm.movej(joint_postiions)
-        arm.moveRobotiqGripper(gripper)
-
-    def _armEEThread(self):
-        while True:
-            if not self.resetting:
-                self.left_arm.updateArmPose(self.left_arm_pose)
-                self.right_arm.updateArmPose(self.right_arm_pose)
-                sleep(0.004)
-        
-    def _gripperThread(self, is_right_arm):
-        while True:
-            if not self.resetting:
-                if is_right_arm:
-                    self.right_arm.moveRobotiqGripper(self.right_gripper)
-                else:
-                    self.left_arm.moveRobotiqGripper(self.left_gripper)
-                sleep(0.004)
+    def _stepJoints(self, action, blocking=True):
+        left_arm_action = {
+            'arm_j': action['left_arm_j'],
+            'gripper': action['left_gripper']
+        }
+        right_arm_action = {
+            'arm_j': action['right_arm_j'],
+            'gripper': action['right_gripper']
+        }
+        self.left_arm_env.step(left_arm_action, blocking)
+        self.right_arm_env.step(right_arm_action, blocking)
 
     def _getObservation(self):
-        # Don't query the arms for ee poses, instead just maintain them
-        # to avoid controller error which causes arm drift
+        left_arm_obs = self.left_arm_env._getObservation()
+        right_arm_obs = self.right_arm_env._getObservation()
         obs = {
-                'left_arm_pose': self.left_arm_pose,
-                'right_arm_pose': self.right_arm_pose,
-                'left_arm_j': self.left_arm.getj(),
-                'right_arm_j': self.right_arm.getj(),
-                'left_gripper': self.left_arm.getGripper(),
-                'right_gripper': self.right_arm.getGripper()
+                'left_arm_pose': left_arm_obs['arm_pose'],
+                'right_arm_pose': right_arm_obs['arm_pose'],
+                'left_arm_j': left_arm_obs['arm_j'],
+                'right_arm_j': right_arm_obs['arm_j'],
+                'left_gripper': left_arm_obs['gripper'],
+                'right_gripper': right_arm_obs['gripper']
                 }
-        if self.use_camera:
-            obs['image'] = self.rs_camera.getCurrentImage()
+        if 'image' in right_arm_obs:
+            obs['image'] = right_arm_obs['image']
         return obs
-    
-    def _limitWorkspace(self, pose, is_right_arm=False):
-        if is_right_arm and pose[2] < 0.21:
-            pose[2] = 0.21
-        elif not is_right_arm and pose[2] < 0.08:
-            pose[2] = 0.08
-        elif pose[2] > 0.55:
-            pose[2] = 0.55
-        return pose
-
-    def render(self):
-        pass
-
-    def close(self):
-        pass
