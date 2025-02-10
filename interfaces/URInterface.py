@@ -56,15 +56,15 @@ class URInterface:
     def getGripper(self):
         return self.robotiq_gripper.getGripperStatus()
 
-    """ Updates the robot position via modbus """
-    def updateArmPose(self, target_pose):
-        # Pose values will be divided by 100 in URScript
-        target_pose = np.array(target_pose) * 100
+    """ Send values to the arm via modbus. Values are either ee pose or joint positions """
+    def sendModbusValues(self, values):
+        # Values will be divided by 100 in URScript
+        values = np.array(values) * 100
         builder = BinaryPayloadBuilder(byteorder=Endian.BIG, wordorder=Endian.BIG)
         # Loop through each pose value and write it to a register
         for i in range(6):
             builder.reset()
-            builder.add_16bit_int(int(target_pose[i]))
+            builder.add_16bit_int(int(values[i]))
             payload = builder.to_registers()
             self.modbus_client.write_register(128 + i, payload[0])
 

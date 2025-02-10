@@ -4,8 +4,10 @@ import threading
 from time import sleep
 
 class UREnv:
-    def __init__(self, ee_actions=True, arm_ip='192.168.1.2', start_joint_positions=None,
+    def __init__(self, action_type='ee', arm_ip='192.168.1.2', limit_workspace=False, start_joint_positions=None,
                  has_3f_gripper=True, robotiq_gripper_port='/dev/ttyUSB0', use_camera=False):
+        
+        self.limit_workspace = limit_workspace
                 
         self.start_joint_positions = start_joint_positions
         if start_joint_positions == None:
@@ -15,13 +17,17 @@ class UREnv:
         self.arm = URInterface(arm_ip, self.start_joint_positions, has_3f_gripper=has_3f_gripper,
                                     robotiq_gripper_port=robotiq_gripper_port)
         self.arm_pose = self.arm.getPose()
+        self.arm_j = self.arm.getj()
         self.gripper = self.arm.getGripper()
 
         self.resetting = False
 
-        self.ee_actions = ee_actions
-        if self.ee_actions:
-            self.arm_thread = threading.Thread(target=self._armEEThread)
+        self.valid_action_types = ['ee', 'joint_urx', 'joint_modbus']
+        if not action_type in self.valid_action_types:
+            raise ValueError(f"Invalid action type: {action_type}. Valid action types are {self.valid_action_types}")
+        self.action_type = action_type
+        if self._usesEEActions() or self._usesJointModbusActions():
+            self.arm_thread = threading.Thread(target=self._armModbusThread)
             self.gripper_thread = threading.Thread(target=self._gripperThread)
             self.arm_thread.start()
             self.gripper_thread.start()
@@ -38,43 +44,61 @@ class UREnv:
         self.resetting = True
         sleep(1)
         self.arm.resetPosition()
-        # Send current pose to arms so that it won't jump when the programs are started
-        if self.ee_actions:
+        # Send current pose or joint values to arms so that it won't jump when the programs are started
+        if self._usesEEActions() or self._usesJointModbusActions():
             self.arm_pose = self.arm.getPose()
+            self.arm_j = self.arm.getj()
             self.gripper = self.arm.getGripper()
             for _ in range(10):
-                self.arm.updateArmPose(self.arm_pose)
+                if self._usesEEActions():
+                    self.arm.sendModbusValues(self.arm_pose)
+                elif self._usesJointModbusActions():
+                    self.arm.sendModbusValues(self.arm_j)
         self.resetting = False
         print("UREnv: Finished Resetting. Start UR Program")
         return self._getObservation()
     
     def step(self, action, blocking=True):
-        if self.ee_actions:
+        if self._usesEEActions():
             self._stepEE(action)
-        else:
-            self._stepJoints(action, blocking)
+        elif self._usesJointURXActions():
+            self._stepJointsURX(action, blocking)
+        elif self._usesJointModbusActions():
+            self._stepJointModbus(action)
         return self._getObservation()
     
     def _stepEE(self, action):
-        self.arm_pose = self._limitWorkspace(action['arm_pose'])
+        if self.limit_workspace:
+            self.arm_pose = self._limitWorkspace(action['arm_pose'])
+        else:
+            self.arm_pose = action['arm_pose']
         self.gripper = action['gripper']
 
-    def _stepJoints(self, action, blocking=True):
+    def _stepJointsURX(self, action, blocking=True):
         arm_j = action['arm_j']
         gripper = action['gripper']
         arm_thread = threading.Thread(target=self._armJThread,
                                             args=(arm_j, gripper, blocking))
         arm_thread.start()
         arm_thread.join()
+
+    def _stepJointModbus(self, action):
+        arm_j = action['arm_j']
+        gripper = action['gripper']
+        self.arm_j = arm_j
+        self.gripper = gripper
     
     def _armJThread(self, joint_postiions, gripper, blocking=True):
         self.arm.movej(joint_postiions, blocking=blocking)
         self.arm.moveRobotiqGripper(gripper)
 
-    def _armEEThread(self):
+    def _armModbusThread(self):
         while True:
             if not self.resetting:
-                self.arm.updateArmPose(self.arm_pose)
+                if self._usesEEActions():
+                    self.arm.sendModbusValues(self.arm_pose)
+                elif self._usesJointModbusActions():
+                    self.arm.sendModbusValues(self.arm_j)
                 sleep(0.004)
     
     def _gripperThread(self):
@@ -84,15 +108,22 @@ class UREnv:
                 sleep(0.004)
 
     def _getObservation(self):
-        # Don't query the arms for ee poses, instead just maintain them
-        # to avoid controller error which causes arm drift
         obs = {
-                'arm_pose': self.arm_pose,
-                'arm_j': self.arm.getj(),
                 'gripper': self.arm.getGripper(),
                 }
+
+        # Don't query the arms for ee poses and joint values when doing modbus control,
+        # instead just maintain them internally to avoid controller error which causes arm drift
+        if self._usesEEActions():
+            obs['arm_pose'] = self.arm_pose
+        elif self._usesJointModbusActions():
+            obs['arm_j'] = self.arm_j
+        elif self._usesJointURXActions():
+            obs['arm_j'] = self.arm.getj()
+
         if self.use_camera:
             obs['image'] = self.rs_camera.getCurrentImage()
+
         return obs
     
     def _limitWorkspace(self, pose, is_right_arm=False):
@@ -103,3 +134,12 @@ class UREnv:
         elif pose[2] > 0.55:
             pose[2] = 0.55
         return pose
+    
+    def _usesEEActions(self):
+        return self.action_type == 'ee'
+    
+    def _usesJointURXActions(self):
+        return self.action_type == 'joint_urx'
+    
+    def _usesJointModbusActions(self):
+        return self.action_type == 'joint_modbus'

@@ -3,6 +3,8 @@ import numpy as np
 import cv2
 import threading
 from time import sleep
+import sys
+import signal
 
 class RSCameraInterface:
     def __init__(self):
@@ -25,18 +27,21 @@ class RSCameraInterface:
 
     def _captureLoop(self):
         self.pipeline.start(self.config)
-        while self.running:
-            # Wait for a coherent set of frames (color frame)
-            frames = self.pipeline.wait_for_frames()
-            color_frame = frames.get_color_frame()
-            if not color_frame:
-                continue
-            # Convert the color frame to a NumPy array
-            self.current_image = np.asanyarray(color_frame.get_data())
-            # Display the image
-            cv2.imshow('RealSense Camera', self.current_image)
-            cv2.waitKey(1) # Waits 1ms to allow the image to be displayed
-
+        try:
+            while self.running:
+                # Wait for a coherent set of frames (color frame)
+                frames = self.pipeline.wait_for_frames()
+                color_frame = frames.get_color_frame()
+                if not color_frame:
+                    continue
+                # Convert the color frame to a NumPy array
+                self.current_image = np.asanyarray(color_frame.get_data())
+                # Display the image
+                cv2.imshow('RealSense Camera', self.current_image)
+                cv2.waitKey(1) # Waits 1ms to allow the image to be displayed
+        except KeyboardInterrupt:
+            self.stopCapture()
+            sys.exit(0)
 
     def stopCapture(self):
         self.running = False

@@ -65,7 +65,7 @@ class ModelEvalInterface:
             image = obs['image']
             # Change image shape to have channels first
             image = np.transpose(image, (2, 0, 1))
-            model_obs['image'] = image
+            model_obs['images'] = image
         return model_obs
 
     def _constructActionBasedOnEnv(self, env_obs, predictions):
