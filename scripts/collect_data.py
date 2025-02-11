@@ -8,8 +8,8 @@ from interfaces.GelloTeleopInterface import GelloTeleopInterface
 from environments.UREnv import UREnv
 
 env = UREnv(arm_ip='192.168.1.2', action_type='joint_modbus', has_3f_gripper=False, use_camera=False,
-            start_joint_positions=tuple([-0.24998416922876388, -1.7198324547208657, 1.679989898534176,
-                                         -1.2799687296482702, -1.6400153041470498, 0.0251830629902318]))
+            start_joint_positions=tuple([-0.12000154017691589, -1.2999819322497066, 1.4899832468026277,
+                                         -1.6300103939608643, -1.610023678771351, -0.16988598712184366]))
 
 # teleop_interface = KeyboardTeleopInterface(env=env)
 teleop_interface = GelloTeleopInterface(env=env)

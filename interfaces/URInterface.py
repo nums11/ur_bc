@@ -83,22 +83,21 @@ class URInterface:
     """ Reset arm to start joint positions and reset gripper """
     def resetPositionURX(self):
         print("URInterface: Resetting Arm at IP", self.ip, "to start position")
+        self.resetGripper()
         self.arm.movej(self.start_joint_positions)
         print("URInterface: Finished Resetting Arm at IP", self.ip, "to start position")
-        self.robotiq_gripper.resetPosition()
-        # Wait until the gripper is open
-        while self.robotiq_gripper.getGripperPosition() > 10:
-            continue
-        print("URInterface: Finished resetting Robotiq Gripper to start position")
         
     def resetPositionModbus(self):
         print("URInterface: Resetting Arm at IP", self.ip, "to start position")
+        self.resetGripper()
         path = np.linspace(self.getj(), self.start_joint_positions, num=10)
         # Execute the path
         for joint_positions in path:
             self.sendModbusValues(joint_positions)
             sleep(0.001)
         print("URInterface: Finished Resetting Arm at IP", self.ip, "to start position")
+
+    def resetGripper(self):
         self.robotiq_gripper.resetPosition()
         # Wait until the gripper is open
         while self.robotiq_gripper.getGripperPosition() > 10:
