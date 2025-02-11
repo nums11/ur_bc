@@ -14,8 +14,8 @@ from environments.UREnv import UREnv
 
 
 env = UREnv(arm_ip='192.168.1.2', action_type='joint_modbus', has_3f_gripper=False, use_camera=False,
-            start_joint_positions=tuple([-0.10629827887637866, -1.6298863407376247, 1.7127541813994434,
-                                         -1.5893177186083927, -1.5499636211225312, 1.509095389142811]))
+            start_joint_positions=tuple([-0.24998416922876388, -1.7198324547208657, 1.679989898534176,
+                                         -1.2799687296482702, -1.6400153041470498, 0.0251830629902318]))
 
 teleop = GelloTeleopInterface(env=env)
 teleop.start()

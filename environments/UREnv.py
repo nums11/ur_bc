@@ -26,7 +26,7 @@ class UREnv:
         if not action_type in self.valid_action_types:
             raise ValueError(f"Invalid action type: {action_type}. Valid action types are {self.valid_action_types}")
         self.action_type = action_type
-        if self._usesEEActions() or self._usesJointModbusActions():
+        if self.usesEEActions() or self.usesJointModbusActions():
             self.arm_thread = threading.Thread(target=self._armModbusThread)
             self.gripper_thread = threading.Thread(target=self._gripperThread)
             self.arm_thread.start()
@@ -45,25 +45,25 @@ class UREnv:
         sleep(1)
         self.arm.resetPosition()
         # Send current pose or joint values to arms so that it won't jump when the programs are started
-        if self._usesEEActions() or self._usesJointModbusActions():
+        if self.usesEEActions() or self.usesJointModbusActions():
             self.arm_pose = self.arm.getPose()
             self.arm_j = self.arm.getj()
             self.gripper = self.arm.getGripper()
             for _ in range(10):
-                if self._usesEEActions():
+                if self.usesEEActions():
                     self.arm.sendModbusValues(self.arm_pose)
-                elif self._usesJointModbusActions():
+                elif self.usesJointModbusActions():
                     self.arm.sendModbusValues(self.arm_j)
         self.resetting = False
         print("UREnv: Finished Resetting. Start UR Program")
         return self._getObservation()
     
     def step(self, action, blocking=True):
-        if self._usesEEActions():
+        if self.usesEEActions():
             self._stepEE(action)
-        elif self._usesJointURXActions():
+        elif self.usesJointURXActions():
             self._stepJointsURX(action, blocking)
-        elif self._usesJointModbusActions():
+        elif self.usesJointModbusActions():
             self._stepJointModbus(action)
         return self._getObservation()
     
@@ -95,9 +95,9 @@ class UREnv:
     def _armModbusThread(self):
         while True:
             if not self.resetting:
-                if self._usesEEActions():
+                if self.usesEEActions():
                     self.arm.sendModbusValues(self.arm_pose)
-                elif self._usesJointModbusActions():
+                elif self.usesJointModbusActions():
                     self.arm.sendModbusValues(self.arm_j)
                 sleep(0.004)
     
@@ -114,11 +114,11 @@ class UREnv:
 
         # Don't query the arms for ee poses and joint values when doing modbus control,
         # instead just maintain them internally to avoid controller error which causes arm drift
-        if self._usesEEActions():
+        if self.usesEEActions():
             obs['arm_pose'] = self.arm_pose
-        elif self._usesJointModbusActions():
+        elif self.usesJointModbusActions():
             obs['arm_j'] = self.arm_j
-        elif self._usesJointURXActions():
+        elif self.usesJointURXActions():
             obs['arm_j'] = self.arm.getj()
 
         if self.use_camera:
@@ -135,11 +135,11 @@ class UREnv:
             pose[2] = 0.55
         return pose
     
-    def _usesEEActions(self):
+    def usesEEActions(self):
         return self.action_type == 'ee'
     
-    def _usesJointURXActions(self):
+    def usesJointURXActions(self):
         return self.action_type == 'joint_urx'
     
-    def _usesJointModbusActions(self):
+    def usesJointModbusActions(self):
         return self.action_type == 'joint_modbus'

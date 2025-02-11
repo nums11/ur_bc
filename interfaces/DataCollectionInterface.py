@@ -109,8 +109,12 @@ class DataCollectionInterface:
                     current_obs[0]['left_gripper'] == 0 and next_obs[0]['left_gripper'] == 0 and
                     current_obs[0]['right_gripper'] == 0 and next_obs[0]['right_gripper'] == 0)
         elif type(self.teleop_interface.env) == UREnv:
-            return (np.linalg.norm(current_obs[0]['arm_pose'] - next_obs[0]['arm_pose']) <= 1e-4 and
-                    current_obs[0]['gripper'] == 0 and next_obs[0]['gripper'] == 0)
+            if self.teleop_interface.env.usesEEActions():
+                return (np.linalg.norm(current_obs[0]['arm_pose'] - next_obs[0]['arm_pose']) <= 1e-4 and
+                        current_obs[0]['gripper'] == 0 and next_obs[0]['gripper'] == 0)
+            elif self.teleop_interface.env.usesJointModbusActions():
+                return (np.linalg.norm(current_obs[0]['arm_j'] - next_obs[0]['arm_j']) <= 1e-4 and
+                        current_obs[0]['gripper'] == 0 and next_obs[0]['gripper'] == 0)
     
     def _saveTrajectory(self, trajectory, remove_zero_actions):
         filename = self._getDatasetFilename()

@@ -51,3 +51,6 @@ class GelloTeleopInterface:
                 'gripper': gripper
             }
         return action
+    
+    def getObservation(self):
+        return self.obs
