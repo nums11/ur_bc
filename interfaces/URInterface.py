@@ -5,6 +5,7 @@ from pymodbus.payload import BinaryPayloadBuilder
 from pymodbus.constants import Endian
 from .Robotiq3fGripperInterface import Robotiq3fGripperInterface
 from .Robotiq2f85Interface import Robotiq2f85Interface
+from time import sleep
 import numpy as np
 
 class URInterface:
@@ -80,7 +81,7 @@ class URInterface:
             return self.arm.getj()
         
     """ Reset arm to start joint positions and reset gripper """
-    def resetPosition(self):
+    def resetPositionURX(self):
         print("URInterface: Resetting Arm at IP", self.ip, "to start position")
         self.arm.movej(self.start_joint_positions)
         print("URInterface: Finished Resetting Arm at IP", self.ip, "to start position")
@@ -90,3 +91,16 @@ class URInterface:
             continue
         print("URInterface: Finished resetting Robotiq Gripper to start position")
         
+    def resetPositionModbus(self):
+        print("URInterface: Resetting Arm at IP", self.ip, "to start position")
+        path = np.linspace(self.getj(), self.start_joint_positions, num=10)
+        # Execute the path
+        for joint_positions in path:
+            self.sendModbusValues(joint_positions)
+            sleep(0.001)
+        print("URInterface: Finished Resetting Arm at IP", self.ip, "to start position")
+        self.robotiq_gripper.resetPosition()
+        # Wait until the gripper is open
+        while self.robotiq_gripper.getGripperPosition() > 10:
+            continue
+        print("URInterface: Finished resetting Robotiq Gripper to start position")

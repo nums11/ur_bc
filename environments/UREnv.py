@@ -37,13 +37,18 @@ class UREnv:
             self.rs_camera = RSCameraInterface()
             self.rs_camera.startCapture()
 
+        self.reset_counter = 0
+
         print("Initialized UREnv")
 
     def reset(self):
         print("UREnv: Resetting")
         self.resetting = True
         sleep(1)
-        self.arm.resetPosition()
+        if self.reset_counter == 0:
+            self.arm.resetPositionURX()
+        else:
+            self.arm.resetPositionModbus()
         # Send current pose or joint values to arms so that it won't jump when the programs are started
         if self.usesEEActions() or self.usesJointModbusActions():
             self.arm_pose = self.arm.getPose()
@@ -56,6 +61,7 @@ class UREnv:
                     self.arm.sendModbusValues(self.arm_j)
         self.resetting = False
         print("UREnv: Finished Resetting. Start UR Program")
+        self.reset_counter += 1
         return self._getObservation()
     
     def step(self, action, blocking=True):
