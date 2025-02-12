@@ -8,6 +8,7 @@ class GelloTeleopInterface:
     def __init__(self, env):
         # Initialize the interface
         self.env = env
+        assert self.env.action_type == "joint_modbus", "GelloTeleopInterface only supports action_type 'joint_modbus'"
         self.resetting = False
         self.agent = GelloAgent(port='/dev/serial/by-id/usb-FTDI_USB__-__Serial_Converter_FT9MFSJV-if00-port0')
         self.obs = {}

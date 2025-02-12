@@ -26,6 +26,8 @@ class ModelEvalInterface:
         # self.batch_size = 1  # Assuming batch size of 1 for simplicity
         # self.left_joint_and_gripper_buffer = np.zeros((self.frame_stack_size, self.batch_size, self.joint_and_gripper_size))
         # self.right_joint_and_gripper_buffer = np.zeros((self.frame_stack_size, self.batch_size, self.joint_and_gripper_size))
+        self.joint_mean, self.joint_max, self.joint_min = self._calculate_joint_mean(data_dir='/home/weirdlab/ur_bc/data')
+        print("Joint mean:", self.joint_mean, "Joint max:", self.joint_max, "Joint min:", self.joint_min)
         print("ModelEvalInterface: Initialized")
 
     def evaluate(self):
@@ -67,6 +69,18 @@ class ModelEvalInterface:
             image = np.transpose(image, (2, 0, 1))
             model_obs['images'] = image
         return model_obs
+    
+    def _calculate_joint_mean(self, data_dir):
+        joint_positions = []
+        traj_filenames = os.listdir(data_dir)
+        for traj_filename in traj_filenames:
+            traj_path = os.path.join(data_dir, traj_filename)
+            traj = dict(np.load(traj_path, allow_pickle=True).items())
+            for t in range(len(traj)):
+                obs = traj[str(t)][0]
+                joint_positions.append(obs['arm_j'])
+        joint_positions = np.array(joint_positions)
+        return np.mean(joint_positions), np.max(joint_positions), np.min(joint_positions)
 
     def _constructActionBasedOnEnv(self, env_obs, predictions):
         action = None
@@ -94,8 +108,8 @@ class ModelEvalInterface:
             }
         elif type(self.env) == UREnv:
             arm_delta = predictions[:6]
-            # gripper = self._unnormalizeGripper(predictions[6])
-            gripper = predictions[6]
+            gripper = self._unnormalizeGripper(predictions[6])
+            # gripper = predictions[6]
 
             print("Predicted")
             print("arm_delta", arm_delta)
@@ -112,10 +126,13 @@ class ModelEvalInterface:
         return gripper_value * 0.02
     
     def _unnormalizeGripper(self, gripper_value):
-        return gripper_value / 0.02
+        return gripper_value / self.joint_mean
+
+    def _unnormalizeGripperMean(self, gripper_value):
+        return gripper_value * (self.joint_max - self.joint_min) + self.joint_mean
     
     def _convertGripperToBinary(self, gripper_value):
-        return gripper_value > 0.4
+        return gripper_value > 0.5
     
     # def _convertEnvObsToTransformerObs(self, obs):
     #     left_arm_j = obs['left_arm_j']

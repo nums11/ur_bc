@@ -48,4 +48,4 @@ class DataReplayInterface:
         return action
 
     def _convertGripperToBinary(self, gripper_value):
-        return gripper_value > 0.5
+        return gripper_value >= 0.5

@@ -19,11 +19,26 @@ class RobomimicDataInterface:
         elif self.env_type == UREnv:
             processed_trajectories, num_samples = self._process_trajectories(data_dir, use_images)
             self._create_hdf5_dataset(processed_trajectories, hdf5_path, use_images, num_samples)
+    
+    def _calculate_joint_mean(self, data_dir):
+        joint_positions = []
+        traj_filenames = os.listdir(data_dir)
+        for traj_filename in traj_filenames:
+            traj_path = os.path.join(data_dir, traj_filename)
+            traj = dict(np.load(traj_path, allow_pickle=True).items())
+            for t in range(len(traj)):
+                obs = traj[str(t)][0]
+                joint_positions.append(obs['arm_j'])
+        joint_positions = np.array(joint_positions)
+        return np.mean(joint_positions), np.max(joint_positions), np.min(joint_positions)
 
     def _process_trajectories(self, data_dir, use_images):
+        print("In projcess_trajectories")
         processed_trajectories = []
         num_samples = 0
         traj_filenames = os.listdir(data_dir)
+        joint_mean, joint_max, joint_min = self._calculate_joint_mean(data_dir)
+        print("Joint mean:", joint_mean, "Joint max:", joint_max, "Joint min:", joint_min)
         for traj_filename in traj_filenames:
             traj_path = os.path.join(data_dir, traj_filename)
             traj = dict(np.load(traj_path, allow_pickle=True).items())
@@ -43,10 +58,10 @@ class RobomimicDataInterface:
                 next_obs = traj[str(t+1)][0]
                 arm_j = np.array(obs['arm_j'])
                 # obs_gripper = np.expand_dims(obs['gripper'] * 0.02, axis=0)
-                obs_gripper = np.expand_dims(obs['gripper'], axis=0)
+                obs_gripper = np.expand_dims(obs['gripper'] * joint_mean, axis=0)
                 next_arm_j = np.array(next_obs['arm_j'])
                 # next_obs_gripper = np.expand_dims(next_obs['gripper'] * 0.02, axis=0)
-                next_obs_gripper = np.expand_dims(next_obs['gripper'], axis=0)
+                next_obs_gripper = np.expand_dims(next_obs['gripper'] * joint_mean, axis=0)
 
                 joint_delta = np.subtract(next_arm_j, arm_j)
 
@@ -64,6 +79,7 @@ class RobomimicDataInterface:
         return processed_trajectories, num_samples
 
     def _process_trajectories_bimanual(self, data_dir, use_images):
+        print("In projcess_trajectories_bimanual")
         processed_trajectories = []
         num_samples = 0
         traj_filenames = os.listdir(data_dir)

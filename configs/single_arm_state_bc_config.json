@@ -37,7 +37,7 @@
     },
     "train": {
         "data": null,
-        "output_dir": "../one_arm_state_bc_models",
+        "output_dir": "../gello_pick_v2_state_bc_models",
         "num_data_workers": 0,
         "hdf5_cache_mode": "all",
         "hdf5_use_swmr": true,

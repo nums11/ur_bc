@@ -7,4 +7,4 @@ from environments.BimanualUREnv import BimanualUREnv
 from environments.UREnv import UREnv
 
 data_interface = RobomimicDataInterface(env_type=UREnv)
-data_interface.convertToRobomimicDataset(use_images=True)
+data_interface.convertToRobomimicDataset(use_images=False)

@@ -8,6 +8,7 @@ class KeyboardTeleopInterface:
     def __init__(self, env):
         # Initialize the interface
         self.env = env
+        assert self.env.action_type == "ee", "KeyboardTeleopInterface only supports action_type 'ee'"
         self.keyboard_controller = KeyboardController()
         self.resetting = False
         self.obs = {}

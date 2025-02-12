@@ -6,9 +6,9 @@ from interfaces.DataReplayInterface import DataReplayInterface
 from environments.BimanualUREnv import BimanualUREnv
 from environments.UREnv import UREnv
 
-env = UREnv(arm_ip='192.168.1.2', ee_actions=False, has_3f_gripper=False, use_camera=False,
-            start_joint_positions=tuple([0.00987077648325779, -1.4858401502543641, 2.187743336493244,
-                                          3.99746649637112, -1.3675774280080697, 4.683919160036989]))
+env = UREnv(arm_ip='192.168.1.2', action_type='joint_urx', has_3f_gripper=False, use_camera=False,
+            start_joint_positions=tuple([0.03002155078287483, -1.249977865684886, 1.3399790174166757,
+            -1.6799904601202096, -1.6500190639818983, 2.213486340119196e-05]))
 
 data_interface = DataReplayInterface(env=env)
-data_interface.replayTrajectory(traj_file_path='/home/weirdlab/ur_bc/data/traj_24.npz')
+data_interface.replayTrajectory(traj_file_path='/home/weirdlab/ur_bc/data/traj_12.npz')
