@@ -47,8 +47,14 @@ class UREnv:
         sleep(1)
         if self.reset_counter == 0:
             self.arm.resetPositionURX()
+            self.start_arm_pose = self.arm.getPose()
         else:
-            self.arm.resetPositionModbus()
+            if self.usesEEActions():
+                self.arm.resetPositionModbus(self.arm_pose, self.start_arm_pose)
+            elif self.usesJointModbusActions():
+                self.arm.resetPositionModbus(self.arm_j, self.start_joint_positions)
+            elif self.usesJointURXActions():
+                self.arm.resetPositionURX()
         # Send current pose or joint values to arms so that it won't jump when the programs are started
         if self.usesEEActions() or self.usesJointModbusActions():
             self.arm_pose = self.arm.getPose()

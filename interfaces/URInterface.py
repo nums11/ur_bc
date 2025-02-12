@@ -86,11 +86,12 @@ class URInterface:
         self.resetGripper()
         self.arm.movej(self.start_joint_positions)
         print("URInterface: Finished Resetting Arm at IP", self.ip, "to start position")
-        
-    def resetPositionModbus(self):
+    
+    """ Reset arm to either start joint positions or start ee pose """
+    def resetPositionModbus(self, current_values, start_values):
         print("URInterface: Resetting Arm at IP", self.ip, "to start position")
         self.resetGripper()
-        path = np.linspace(self.getj(), self.start_joint_positions, num=10)
+        path = np.linspace(current_values, start_values, num=10)
         # Execute the path
         for joint_positions in path:
             self.sendModbusValues(joint_positions)
