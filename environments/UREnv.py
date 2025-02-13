@@ -124,13 +124,17 @@ class UREnv:
                 'gripper': self.arm.getGripper(),
                 }
 
-        # Don't query the arms for ee poses and joint values when doing modbus control,
-        # instead just maintain them internally to avoid controller error which causes arm drift
+        # In the case of ee control use the internally maintained arm_pose
+        # and in the case of joint modbus control use the internally maintained arm_j
+        # This helps avoid drift caused by slight controller inaccuracies
         if self.usesEEActions():
             obs['arm_pose'] = self.arm_pose
+            obs['arm_j'] = self.arm.getj()
         elif self.usesJointModbusActions():
+            obs['arm_pose'] = self.arm.getPose()
             obs['arm_j'] = self.arm_j
         elif self.usesJointURXActions():
+            obs['arm_pose'] = self.arm.getPose()
             obs['arm_j'] = self.arm.getj()
 
         if self.use_camera:
