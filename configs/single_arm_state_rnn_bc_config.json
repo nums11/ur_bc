@@ -37,7 +37,7 @@
     },
     "train": {
         "data": null,
-        "output_dir": "../keyboard_pick_45_demos_no_normalize_300_state_bc_models",
+        "output_dir": "../keyboard_pick_45_demos_300_rnn_state_bc_models",
         "num_data_workers": 0,
         "hdf5_cache_mode": "all",
         "hdf5_use_swmr": true,
@@ -135,7 +135,7 @@
             ]
         },
         "rnn": {
-            "enabled": false,
+            "enabled": true,
             "horizon": 10,
             "hidden_dim": 400,
             "rnn_type": "LSTM",

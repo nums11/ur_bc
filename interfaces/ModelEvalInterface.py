@@ -9,16 +9,10 @@ import numpy as np
 from time import sleep
 
 class ModelEvalInterface:
-    def __init__(self, model_path, env, blocking=True, freq=5):
+    def __init__(self, model_path, env):
         self.env = env
         self.model, _ = policy_from_checkpoint(ckpt_path=model_path)
         self.model.start_episode()
-        self.blocking = blocking
-        if not blocking:
-            print("ModelEvalInterface: Non-blocking mode")
-            self.freq_sleep = 1.0 / freq
-        else:
-            print("ModelEvalInterface: Blocking mode")
         # Transformer stuff
         # Initialize buffers with zeros
         # self.frame_stack_size = 10
@@ -30,19 +24,33 @@ class ModelEvalInterface:
         print("Joint mean:", self.joint_mean, "Joint max:", self.joint_max, "Joint min:", self.joint_min)
         print("ModelEvalInterface: Initialized")
 
-    def evaluate(self):
+    def evaluate(self, blocking=True, freq=5, unnormalize=False):
+        print("ModelEvalInterface Evaluating blocking:", blocking, "freq:", freq, "unnormalize:", unnormalize)
+        freq_sleep = 0
+        if not blocking:
+            print("ModelEvalInterface Evaluating: Non-blocking mode")
+            freq_sleep = 1.0 / freq
+        else:
+            print("ModelEvalInterface Evaluating: Blocking mode")
+
         env_obs = self.env.reset()
         sleep(2)
         while True:
             model_obs = self._convertEnvObsToModelObs(env_obs)
+            if model_obs['joint_and_gripper'][6] == 0:
+                print("Entered here to 0")
+                model_obs['joint_and_gripper'][6] = False
+            elif model_obs['joint_and_gripper'][6] == 1:
+                print("Entered here to 1")
+                model_obs['joint_and_gripper'][6] = True
             print("Observed")
             print(model_obs)
 
             predictions = self.model(model_obs)
-            action = self._constructActionBasedOnEnv(env_obs, predictions)
-            env_obs = self.env.step(action, self.blocking)
-            if not self.blocking:
-                sleep(self.freq_sleep)
+            action = self._constructActionBasedOnEnv(env_obs, predictions, unnormalize)
+            env_obs = self.env.step(action, blocking)
+            if not blocking:
+                sleep(freq_sleep)
     
     def _convertEnvObsToModelObs(self, obs):
         model_obs = None
@@ -82,7 +90,7 @@ class ModelEvalInterface:
         joint_positions = np.array(joint_positions)
         return np.mean(joint_positions), np.max(joint_positions), np.min(joint_positions)
 
-    def _constructActionBasedOnEnv(self, env_obs, predictions):
+    def _constructActionBasedOnEnv(self, env_obs, predictions, unnormalize):
         action = None
         if type(self.env) == BimanualUREnv:
             left_arm_delta = predictions[:6]
@@ -108,8 +116,10 @@ class ModelEvalInterface:
             }
         elif type(self.env) == UREnv:
             arm_delta = predictions[:6]
-            gripper = self._unnormalizeGripper(predictions[6])
-            # gripper = predictions[6]
+            if unnormalize:
+                gripper = self._unnormalizeGripper(predictions[6])
+            else:
+                gripper = predictions[6]
 
             print("Predicted")
             print("arm_delta", arm_delta)

@@ -37,7 +37,7 @@
     },
     "train": {
         "data": null,
-        "output_dir": "../keyboard_pick_45_demos_no_normalize_300_state_bc_models",
+        "output_dir": "../keyboard_pick_45_demos_gmm_300_state_bc_models",
         "num_data_workers": 0,
         "hdf5_cache_mode": "all",
         "hdf5_use_swmr": true,
@@ -93,7 +93,7 @@
             "low_noise_eval": true
         },
         "gmm": {
-            "enabled": false,
+            "enabled": true,
             "num_modes": 5,
             "min_std": 0.0001,
             "std_activation": "softplus",

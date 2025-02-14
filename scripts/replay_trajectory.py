@@ -11,4 +11,4 @@ env = UREnv(arm_ip='192.168.1.2', action_type='joint_urx', has_3f_gripper=False,
                                          -1.6486337716066046, -1.5906957964802926, 1.603541160134426]))
 
 data_interface = DataReplayInterface(env=env)
-data_interface.replayTrajectory(traj_file_path='/home/weirdlab/ur_bc/data/traj_0.npz')
+data_interface.replayTrajectory(traj_file_path='/home/weirdlab/ur_bc/data/traj_10.npz')

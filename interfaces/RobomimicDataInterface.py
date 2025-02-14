@@ -12,12 +12,14 @@ class RobomimicDataInterface:
         
     def convertToRobomimicDataset(self, data_dir='/home/weirdlab/ur_bc/data/',
                                   hdf5_path='/home/weirdlab/ur_bc/robomimic_dataset.hdf5',
-                                  use_images=False):
+                                  use_images=False,
+                                  normalize=False):
+        print("RobomimicDataInterface Converting: use_images:", use_images, "normalize:", normalize)
         if self.env_type == BimanualUREnv:
-            processed_trajectories, num_samples = self._process_trajectories_bimanual(data_dir, use_images)
+            processed_trajectories, num_samples = self._process_trajectories_bimanual(data_dir, use_images, normalize)
             self._create_bimanual_hdf5_dataset(processed_trajectories, hdf5_path, use_images, num_samples)
         elif self.env_type == UREnv:
-            processed_trajectories, num_samples = self._process_trajectories(data_dir, use_images)
+            processed_trajectories, num_samples = self._process_trajectories(data_dir, use_images, normalize)
             self._create_hdf5_dataset(processed_trajectories, hdf5_path, use_images, num_samples)
     
     def _calculate_joint_mean(self, data_dir):
@@ -32,7 +34,7 @@ class RobomimicDataInterface:
         joint_positions = np.array(joint_positions)
         return np.mean(joint_positions), np.max(joint_positions), np.min(joint_positions)
 
-    def _process_trajectories(self, data_dir, use_images):
+    def _process_trajectories(self, data_dir, use_images, normalize):
         print("In projcess_trajectories")
         processed_trajectories = []
         num_samples = 0
@@ -57,11 +59,17 @@ class RobomimicDataInterface:
                 obs = traj[str(t)][0]
                 next_obs = traj[str(t+1)][0]
                 arm_j = np.array(obs['arm_j'])
-                # obs_gripper = np.expand_dims(obs['gripper'] * 0.02, axis=0)
-                obs_gripper = np.expand_dims(obs['gripper'] * joint_mean, axis=0)
+                if normalize:
+                    obs_gripper = np.expand_dims(obs['gripper'] * joint_mean, axis=0)
+                else:
+                    obs_gripper = np.expand_dims(obs['gripper'], axis=0)
+
                 next_arm_j = np.array(next_obs['arm_j'])
-                # next_obs_gripper = np.expand_dims(next_obs['gripper'] * 0.02, axis=0)
-                next_obs_gripper = np.expand_dims(next_obs['gripper'] * joint_mean, axis=0)
+
+                if normalize:
+                    next_obs_gripper = np.expand_dims(next_obs['gripper'] * joint_mean, axis=0)
+                else:
+                    next_obs_gripper = np.expand_dims(next_obs['gripper'], axis=0)
 
                 joint_delta = np.subtract(next_arm_j, arm_j)
 
