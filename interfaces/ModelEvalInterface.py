@@ -7,6 +7,7 @@ from environments.BimanualUREnv import BimanualUREnv
 from environments.UREnv import UREnv
 import numpy as np
 from time import sleep
+from pynput.keyboard import Listener
 
 class ModelEvalInterface:
     def __init__(self, model_path, env):
@@ -22,19 +23,38 @@ class ModelEvalInterface:
         # self.right_joint_and_gripper_buffer = np.zeros((self.frame_stack_size, self.batch_size, self.joint_and_gripper_size))
         self.joint_mean, self.joint_max, self.joint_min = self._calculate_joint_mean(data_dir='/home/weirdlab/ur_bc/data')
         print("Joint mean:", self.joint_mean, "Joint max:", self.joint_max, "Joint min:", self.joint_min)
+
+        # Start the pynput keyboard listener
+        self.start_evaluation = False
+        self.keyboard_listener = Listener(
+            on_release=self._on_release
+        )
+        self.keyboard_listener.start()
         print("ModelEvalInterface: Initialized")
 
-    def evaluate(self, blocking=True, freq=5, unnormalize=False):
+            
+    def _on_release(self, key):
+        if not hasattr(key, 'char'):
+            return
+        if key.char == '1':
+            self.start_evaluation = True
+
+    def evaluate(self, blocking=False, freq=5, unnormalize=False):
         print("ModelEvalInterface Evaluating blocking:", blocking, "freq:", freq, "unnormalize:", unnormalize)
+
+        assert not (self.env.action_type == 'joint_modbus' and blocking), "Blocking mode not supported for joint_modbus action type"
+
         freq_sleep = 0
         if not blocking:
-            print("ModelEvalInterface Evaluating: Non-blocking mode")
             freq_sleep = 1.0 / freq
-        else:
-            print("ModelEvalInterface Evaluating: Blocking mode")
 
         env_obs = self.env.reset()
         sleep(2)
+
+        print("ModelEvalInterface: Start the UR Prgram then press '1' to start evaluation")
+        while not self.start_evaluation:
+            continue
+        
         while True:
             model_obs = self._convertEnvObsToModelObs(env_obs)
             if model_obs['joint_and_gripper'][6] == 0:

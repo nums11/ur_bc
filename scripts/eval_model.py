@@ -12,7 +12,12 @@ from environments.UREnv import UREnv
 #     right_arm_start_joint_positions=tuple([0.061464341157311926, -1.458567090373423, -2.167427672040368,
 #                                             -0.9523999794696154, -4.662324173700186, 3.443543061887108]))
 
-env = UREnv(arm_ip='192.168.1.2', action_type='joint_urx', has_3f_gripper=False, use_camera=False,
+# env = UREnv(arm_ip='192.168.1.2', action_type='joint_urx', has_3f_gripper=False, use_camera=False,
+#             start_joint_positions=tuple([-0.012119847983496967, -1.2344485025217573, 1.3694299784791504,
+#                                          -1.6486337716066046, -1.5906957964802926, 1.603541160134426]))
+
+
+env = UREnv(arm_ip='192.168.1.2', action_type='joint_modbus', has_3f_gripper=False, use_camera=False,
             start_joint_positions=tuple([-0.012119847983496967, -1.2344485025217573, 1.3694299784791504,
                                          -1.6486337716066046, -1.5906957964802926, 1.603541160134426]))
 
@@ -20,4 +25,4 @@ model_eval = ModelEvalInterface(
     env=env,
     model_path="/home/weirdlab/ur_bc/robomimic/keyboard_pick_45_demos_no_normalize_300_state_bc_models/test/20250213161517/models/model_epoch_200.pth",
 )
-model_eval.evaluate(blocking=True)
+model_eval.evaluate(blocking=False, freq=5)
