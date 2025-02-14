@@ -18,7 +18,7 @@ class DataReplayInterface:
         sorted_timesteps = sorted(trajectory.keys(), key=lambda x: int(x))
         print("DataInterface: Replaying Trajectory of length", len(sorted_timesteps))
 
-        for t in enumerate(sorted_timesteps):
+        for t in sorted_timesteps:
             print("Timestep", t)
             obs = trajectory[str(t)][0]
             action = self._constructActionBasedOnEnv(obs)
