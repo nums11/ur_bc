@@ -37,7 +37,7 @@
     },
     "train": {
         "data": null,
-        "output_dir": "../gello_pick_41_demos_normalize_state_bc_models",
+        "output_dir": "../gello_pick_41_demos_std_normalize_with_gripper_state_bc_models",
         "num_data_workers": 0,
         "hdf5_cache_mode": "all",
         "hdf5_use_swmr": true,

@@ -23,6 +23,6 @@ env = UREnv(arm_ip='192.168.1.2', action_type='joint_urx', has_3f_gripper=False,
 
 model_eval = ModelEvalInterface(
     env=env,
-    model_path="/home/weirdlab/ur_bc/robomimic/gello_pick_41_demos_normalize_state_bc_models/test/20250213212321/models/model_epoch_100.pth",
+    model_path="/home/weirdlab/ur_bc/robomimic/gello_pick_41_demos_std_normalize_with_gripper_state_bc_models/test/20250213220049/models/model_epoch_100.pth",
 )
-model_eval.evaluate(blocking=True, freq=5, normalize=True)
+model_eval.evaluate(blocking=True, freq=5, normalize=True, normalize_type='mean_std')

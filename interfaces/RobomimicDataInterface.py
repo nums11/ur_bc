@@ -8,18 +8,21 @@ from environments.UREnv import UREnv
 class RobomimicDataInterface:
     def __init__(self, env_type):
         self.env_type = env_type
+        self.normalize_types = ['min_max', 'mean_std']
         print("Initialized RobomimicDataInterface")
         
     def convertToRobomimicDataset(self, data_dir='/home/weirdlab/ur_bc/data/',
                                   hdf5_path='/home/weirdlab/ur_bc/robomimic_dataset.hdf5',
                                   use_images=False,
-                                  normalize=False):
-        print("RobomimicDataInterface Converting: use_images:", use_images, "normalize:", normalize)
+                                  normalize=False,
+                                  normalize_type='min_max'):
+        assert normalize_type in self.normalize_types, "Invalid normalize type valid types are: " + str(self.normalize_types)
+        print("RobomimicDataInterface Converting: use_images:", use_images, "normalize:", normalize, "normalize_type:", normalize_type)
         if self.env_type == BimanualUREnv:
             processed_trajectories, num_samples = self._process_trajectories_bimanual(data_dir, use_images, normalize)
             self._create_bimanual_hdf5_dataset(processed_trajectories, hdf5_path, use_images, num_samples)
         elif self.env_type == UREnv:
-            processed_trajectories, num_samples = self._process_trajectories(data_dir, use_images, normalize)
+            processed_trajectories, num_samples = self._process_trajectories(data_dir, use_images, normalize, normalize_type)
             self._create_hdf5_dataset(processed_trajectories, hdf5_path, use_images, num_samples)
     
     def _calculate_min_max(self, data_dir):
@@ -38,14 +41,38 @@ class RobomimicDataInterface:
         min_gripper = 0
         max_gripper = 1
         return min_joint_positions, max_joint_positions
+    
+    def _calculate_mean_std(self, data_dir):
+        joint_positions = []
+        gripper_values = []
+        traj_filenames = os.listdir(data_dir)
+        for traj_filename in traj_filenames:
+            traj_path = os.path.join(data_dir, traj_filename)
+            traj = dict(np.load(traj_path, allow_pickle=True).items())
+            for t in range(len(traj)):
+                obs = traj[str(t)][0]
+                joint_positions.append(obs['arm_j'])
+                gripper_values.append(obs['gripper'])
+        joint_positions = np.array(joint_positions)
+        # Min and values for each joint
+        mean_joint_positions = np.mean(joint_positions, axis=0)
+        std_joint_positions = np.std(joint_positions, axis=0)
+        mean_gripper = np.mean(gripper_values)
+        std_gripper = np.std(gripper_values)
+        return mean_joint_positions, std_joint_positions, mean_gripper, std_gripper
 
-    def _process_trajectories(self, data_dir, use_images, normalize):
+    def _process_trajectories(self, data_dir, use_images, normalize, normalize_type):
         print("In projcess_trajectories")
+        if normalize and normalize_type == 'min_max':
+            min_joint_positions, max_joint_positions = self._calculate_min_max(data_dir)
+            print("min_joint_positions:", min_joint_positions, "max_joint_positions:", max_joint_positions)
+        elif normalize and normalize_type == 'mean_std':
+            mean_joint_positions, std_joint_positions, mean_gripper, std_gripper = self._calculate_mean_std(data_dir)
+            print("mean_joint_positions:", mean_joint_positions, "std_joint_positions:", std_joint_positions)
+
         processed_trajectories = []
         num_samples = 0
         traj_filenames = os.listdir(data_dir)
-        min_joint_positions, max_joint_positions = self._calculate_min_max(data_dir)
-        print("min_joint_positions:", min_joint_positions, "max_joint_positions:", max_joint_positions)
         for traj_filename in traj_filenames:
             traj_path = os.path.join(data_dir, traj_filename)
             traj = dict(np.load(traj_path, allow_pickle=True).items())
@@ -61,17 +88,27 @@ class RobomimicDataInterface:
             for t in range(traj_len):
                 if t == traj_len - 1:
                     break
+                # Grab current and next observations
                 obs = traj[str(t)][0]
                 next_obs = traj[str(t+1)][0]
-                arm_j = np.array(obs['arm_j'])
-                if normalize:
-                    arm_j = (arm_j - min_joint_positions) / (max_joint_positions - min_joint_positions)
-                obs_gripper = np.expand_dims(obs['gripper'], axis=0)
 
+                # Optionally normalize current joint positions
+                arm_j = np.array(obs['arm_j'])
+                obs_gripper = np.expand_dims(obs['gripper'], axis=0)
+                if normalize and normalize_type == 'min_max':
+                    arm_j = (arm_j - min_joint_positions) / (max_joint_positions - min_joint_positions)
+                elif normalize and normalize_type == 'mean_std':
+                    arm_j = (arm_j - mean_joint_positions) / std_joint_positions
+                    obs_gripper = (obs_gripper - mean_gripper) / std_gripper
+
+                # Optionally normalize next joint positions
                 next_arm_j = np.array(next_obs['arm_j'])
-                if normalize:
-                    next_arm_j = (next_arm_j - min_joint_positions) / (max_joint_positions - min_joint_positions)
                 next_obs_gripper = np.expand_dims(next_obs['gripper'], axis=0)
+                if normalize and normalize_type == 'min_max':
+                    next_arm_j = (next_arm_j - min_joint_positions) / (max_joint_positions - min_joint_positions)
+                elif normalize and normalize_type == 'mean_std':
+                    next_arm_j = (next_arm_j - mean_joint_positions) / std_joint_positions
+                    next_obs_gripper = (next_obs_gripper - mean_gripper) / std_gripper
 
                 joint_delta = np.subtract(next_arm_j, arm_j)
 
