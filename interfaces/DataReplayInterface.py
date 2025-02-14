@@ -3,17 +3,22 @@ import threading
 import cv2
 from environments.BimanualUREnv import BimanualUREnv
 from environments.UREnv import UREnv
+from pynput.keyboard import Listener
+from time import sleep
 
 class DataReplayInterface:
     def __init__(self, env):
         self.env = env
         print("Initialized DataReplayInterface")
-    
+
     def replayTrajectory(self, traj_file_path):
+        self.env.reset()
+        
         trajectory = dict(np.load(traj_file_path, allow_pickle=True).items())
         sorted_timesteps = sorted(trajectory.keys(), key=lambda x: int(x))
         print("DataInterface: Replaying Trajectory of length", len(sorted_timesteps))
-        for t in sorted_timesteps:
+
+        for t in enumerate(sorted_timesteps):
             print("Timestep", t)
             obs = trajectory[str(t)][0]
             action = self._constructActionBasedOnEnv(obs)
@@ -22,7 +27,7 @@ class DataReplayInterface:
             if 'image' in obs:
                 image = obs['image']
                 cv2.imwrite("/home/weirdlab/ur_bc/current_obs.jpg", image)
-
+            
     def _constructActionBasedOnEnv(self, obs):
         action = None
         if type(self.env) == BimanualUREnv:

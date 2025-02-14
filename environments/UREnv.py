@@ -95,10 +95,8 @@ class UREnv:
         arm_thread.join()
 
     def _stepJointModbus(self, action):
-        arm_j = action['arm_j']
-        gripper = action['gripper']
-        self.arm_j = arm_j
-        self.gripper = gripper
+        self.arm_j = action['arm_j']
+        self.gripper = action['gripper']
     
     def _armJThread(self, joint_postiions, gripper, blocking=True):
         self.arm.movej(joint_postiions, blocking=blocking)

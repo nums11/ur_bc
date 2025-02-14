@@ -45,13 +45,16 @@ class GelloTeleopInterface:
             raise ValueError("BimanualUREnv not supported")
         elif type(self.env) == UREnv:
             joints = servo_values[:6]
-            gripper = servo_values[6]
+            gripper = self._clipGripper(servo_values[6])
             # Construct Action
             action = {
                 'arm_j': joints,
                 'gripper': gripper
             }
         return action
+    
+    def _clipGripper(self, gripper):
+        return gripper >= 0.5
     
     def getObservation(self):
         return self.obs
