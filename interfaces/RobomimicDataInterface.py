@@ -22,7 +22,7 @@ class RobomimicDataInterface:
             processed_trajectories, num_samples = self._process_trajectories(data_dir, use_images, normalize)
             self._create_hdf5_dataset(processed_trajectories, hdf5_path, use_images, num_samples)
     
-    def _calculate_joint_mean(self, data_dir):
+    def _calculate_min_max(self, data_dir):
         joint_positions = []
         traj_filenames = os.listdir(data_dir)
         for traj_filename in traj_filenames:
@@ -32,15 +32,20 @@ class RobomimicDataInterface:
                 obs = traj[str(t)][0]
                 joint_positions.append(obs['arm_j'])
         joint_positions = np.array(joint_positions)
-        return np.mean(joint_positions), np.max(joint_positions), np.min(joint_positions)
+        # Min and values for each joint
+        min_joint_positions = np.min(joint_positions, axis=0)
+        max_joint_positions = np.max(joint_positions, axis=0)
+        min_gripper = 0
+        max_gripper = 1
+        return min_joint_positions, max_joint_positions
 
     def _process_trajectories(self, data_dir, use_images, normalize):
         print("In projcess_trajectories")
         processed_trajectories = []
         num_samples = 0
         traj_filenames = os.listdir(data_dir)
-        joint_mean, joint_max, joint_min = self._calculate_joint_mean(data_dir)
-        print("Joint mean:", joint_mean, "Joint max:", joint_max, "Joint min:", joint_min)
+        min_joint_positions, max_joint_positions = self._calculate_min_max(data_dir)
+        print("min_joint_positions:", min_joint_positions, "max_joint_positions:", max_joint_positions)
         for traj_filename in traj_filenames:
             traj_path = os.path.join(data_dir, traj_filename)
             traj = dict(np.load(traj_path, allow_pickle=True).items())
@@ -60,16 +65,13 @@ class RobomimicDataInterface:
                 next_obs = traj[str(t+1)][0]
                 arm_j = np.array(obs['arm_j'])
                 if normalize:
-                    obs_gripper = np.expand_dims(obs['gripper'] * joint_mean, axis=0)
-                else:
-                    obs_gripper = np.expand_dims(obs['gripper'], axis=0)
+                    arm_j = (arm_j - min_joint_positions) / (max_joint_positions - min_joint_positions)
+                obs_gripper = np.expand_dims(obs['gripper'], axis=0)
 
                 next_arm_j = np.array(next_obs['arm_j'])
-
                 if normalize:
-                    next_obs_gripper = np.expand_dims(next_obs['gripper'] * joint_mean, axis=0)
-                else:
-                    next_obs_gripper = np.expand_dims(next_obs['gripper'], axis=0)
+                    next_arm_j = (next_arm_j - min_joint_positions) / (max_joint_positions - min_joint_positions)
+                next_obs_gripper = np.expand_dims(next_obs['gripper'], axis=0)
 
                 joint_delta = np.subtract(next_arm_j, arm_j)
 
