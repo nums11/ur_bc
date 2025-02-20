@@ -34,8 +34,10 @@ class UREnv:
 
         self.use_camera = use_camera
         if self.use_camera:
-            self.rs_camera = RSCameraInterface()
+            self.rs_camera = RSCameraInterface(serial_number='746112060198')
+            # self.wrist_cam = RSCameraInterface(serial_number='123622270802')
             self.rs_camera.startCapture()
+            # self.wrist_cam.startCapture()
 
         self.reset_counter = 0
 
@@ -126,7 +128,8 @@ class UREnv:
         obs['arm_j'] = self.arm.getj()
 
         if self.use_camera:
-            obs['image'] = self.rs_camera.getCurrentImage()
+            obs['image'], obs['wrist_image'] = self.rs_camera.getCurrentImage()
+            # obs['wrist_image'] = self.wrist_cam.getCurrentImage()
 
         return obs
     

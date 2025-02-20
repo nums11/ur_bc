@@ -30,6 +30,7 @@ def main():
 
             # Convert the color frame to a NumPy array
             color_image = np.asanyarray(color_frame.get_data())
+            color_image = cv2.flip(color_image, 0)
 
             # Display the image
             cv2.imshow('RealSense Camera', color_image)

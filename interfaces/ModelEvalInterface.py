@@ -17,12 +17,9 @@ class ModelEvalInterface:
         self.model.start_episode()
         # Transformer stuff
         # Initialize buffers with zeros
-        # self.frame_stack_size = 10
-        # self.joint_and_gripper_size = 7  # Assuming 6 joint positions + 1 gripper position
-        # self.batch_size = 1  # Assuming batch size of 1 for simplicity
-        # self.left_joint_and_gripper_buffer = np.zeros((self.frame_stack_size, self.batch_size, self.joint_and_gripper_size))
-        # self.right_joint_and_gripper_buffer = np.zeros((self.frame_stack_size, self.batch_size, self.joint_and_gripper_size))
-
+        self.joint_and_gripper_size = 7  # Assuming 6 joint positions + 1 gripper position
+        # self.joint_and_gripper_buffer = np.zeros((self.frame_stack_size, self.joint_and_gripper_size))
+        self.joint_and_gripper_buffer = None
 
         # Start the pynput keyboard listener
         self.start_evaluation = False
@@ -39,8 +36,10 @@ class ModelEvalInterface:
         if key.char == '1':
             self.start_evaluation = True
 
-    def evaluate(self, blocking=False, freq=5, normalize=False, normalize_type='min_max'):
-        print("ModelEvalInterface Evaluating blocking:", blocking, "freq:", freq, "normalize:", normalize, "normalize_type:", normalize_type)
+    def evaluate(self, blocking=False, freq=5, normalize=False, normalize_type='min_max', transformer_model=False, frame_stack_size=10):
+        print("ModelEvalInterface Evaluating blocking:", blocking, "freq:", freq, "normalize:", normalize, "normalize_type:", normalize_type,
+              "transformer_model:", transformer_model, "frame_stack_size:", frame_stack_size)
+        self.frame_stack_size = frame_stack_size
 
         assert normalize_type in self.normalize_types, "Invalid normalize type valid types are: " + str(self.normalize_types)
 
@@ -67,7 +66,10 @@ class ModelEvalInterface:
                 continue
         
         while True:
-            model_obs = self._convertEnvObsToModelObs(env_obs, normalize, normalize_type)
+            if transformer_model:
+                model_obs = self._convertEnvObsToTransformerObs(env_obs, normalize, normalize_type)
+            else:
+                model_obs = self._convertEnvObsToModelObs(env_obs, normalize, normalize_type)
             print("Observed")
             print(model_obs)
 
@@ -123,11 +125,12 @@ class ModelEvalInterface:
             }
         elif type(self.env) == UREnv:
             arm_j = obs['arm_j']
+            obs_gripper = np.expand_dims(obs['gripper'], axis=0)
             if normalize and normalize_type == 'min_max':
                 arm_j = (arm_j - self.min_joint_positions) / (self.max_joint_positions - self.min_joint_positions)
             elif normalize and normalize_type == 'mean_std':
                 arm_j = (arm_j - self.joint_mean) / self.joint_std
-            obs_gripper = np.expand_dims(obs['gripper'], axis=0)
+                obs_gripper = (obs_gripper - self.gripper_mean) / self.gripper_std
             model_obs = {
                 'joint_and_gripper': np.concatenate((arm_j, obs_gripper))
             }
@@ -187,24 +190,32 @@ class ModelEvalInterface:
     def _convertGripperToBinary(self, gripper_value):
         return gripper_value > 0.5
     
-    # def _convertEnvObsToTransformerObs(self, obs):
-    #     left_arm_j = obs['left_arm_j']
-    #     right_arm_j = obs['right_arm_j']
-    #     left_obs_gripper = np.expand_dims(obs['left_gripper'], axis=0)
-    #     right_obs_gripper = np.expand_dims(obs['right_gripper'], axis=0)
+    def _convertEnvObsToTransformerObs(self, obs, normalize, normalize_type):
+        arm_j = obs['arm_j']
+        obs_gripper = np.expand_dims(obs['gripper'], axis=0)
 
-    #     left_joint_and_gripper = np.concatenate((left_arm_j, left_obs_gripper))
-    #     right_joint_and_gripper = np.concatenate((right_arm_j, right_obs_gripper))
+        if normalize and normalize_type == 'min_max':
+            arm_j = (arm_j - self.min_joint_positions) / (self.max_joint_positions - self.min_joint_positions)
+        elif normalize and normalize_type == 'mean_std':
+            arm_j = (arm_j - self.joint_mean) / self.joint_std
+            obs_gripper = (obs_gripper - self.gripper_mean) / self.gripper_std
 
-    #     # Update buffers
-    #     self.left_joint_and_gripper_buffer = np.roll(self.left_joint_and_gripper_buffer, -1, axis=0)
-    #     self.right_joint_and_gripper_buffer = np.roll(self.right_joint_and_gripper_buffer, -1, axis=0)
-    #     self.left_joint_and_gripper_buffer[-1, 0, :] = left_joint_and_gripper
-    #     self.right_joint_and_gripper_buffer[-1, 0, :] = right_joint_and_gripper
-        
-    #     model_obs = {
-    #         'left_joint_and_gripper': self.left_joint_and_gripper_buffer,
-    #         'right_joint_and_gripper': self.right_joint_and_gripper_buffer,
-    #     }
+        joint_and_gripper = np.concatenate((arm_j, obs_gripper))
 
-    #     return model_obs
+        if self.joint_and_gripper_buffer is None:
+            self._initialize_buffer(joint_and_gripper)
+
+        # Update buffers
+        self.joint_and_gripper_buffer = np.roll(self.joint_and_gripper_buffer, -1, axis=0)
+        self.joint_and_gripper_buffer[-1, :] = joint_and_gripper
+
+        model_obs = {
+            'joint_and_gripper': self.joint_and_gripper_buffer,
+        }
+
+        return model_obs
+    
+    def _initialize_buffer(self, initial_frame):
+        # Initialize the buffer with the initial frame duplicated
+        print("Initializing buffer")
+        self.joint_and_gripper_buffer = np.array([initial_frame] * self.frame_stack_size)

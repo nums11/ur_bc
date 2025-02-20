@@ -7,9 +7,9 @@ from interfaces.KeyboardTeleopInterface import KeyboardTeleopInterface
 from interfaces.GelloTeleopInterface import GelloTeleopInterface
 from environments.UREnv import UREnv
 
-env = UREnv(arm_ip='192.168.1.2', action_type='joint_modbus', has_3f_gripper=False, use_camera=False,
-            start_joint_positions=tuple([0.019999293696813376, -1.239988205690567, 1.3400126691202097,
-                                         4.69998098138019, -1.660014279064388, 0.02001699919159692]))
+env = UREnv(arm_ip='192.168.1.2', action_type='joint_modbus', has_3f_gripper=False, use_camera=True,
+            start_joint_positions=tuple([0.02001814887733113, -1.6683640884454487, 1.7006658119817653,
+                                          4.69998098138019, -1.660022823816746, -1.5367661252713862]))
 
 # env = UREnv(arm_ip='192.168.1.2', action_type='ee', has_3f_gripper=False, use_camera=False,
 #             start_joint_positions=tuple([-0.012119847983496967, -1.2344485025217573, 1.3694299784791504,
@@ -19,4 +19,7 @@ env = UREnv(arm_ip='192.168.1.2', action_type='joint_modbus', has_3f_gripper=Fal
 teleop_interface = GelloTeleopInterface(env=env)
 
 data_interface = DataCollectionInterface(teleop_interface=teleop_interface)
-data_interface.startDataCollection(remove_zero_actions=False, collection_freq_hz=10)
+data_interface.startDataCollection(remove_zero_actions=False, collection_freq_hz=50)
+
+# while True:
+#     pass

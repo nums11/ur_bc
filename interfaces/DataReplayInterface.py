@@ -18,6 +18,8 @@ class DataReplayInterface:
         sorted_timesteps = sorted(trajectory.keys(), key=lambda x: int(x))
         print("DataInterface: Replaying Trajectory of length", len(sorted_timesteps))
 
+        print(len(sorted_timesteps))
+        sorted_timesteps = sorted_timesteps[200:]
         for t in sorted_timesteps:
             print("Timestep", t)
             obs = trajectory[str(t)][0]
@@ -26,7 +28,9 @@ class DataReplayInterface:
 
             if 'image' in obs:
                 image = obs['image']
-                cv2.imwrite("/home/weirdlab/ur_bc/current_obs.jpg", image)
+                wrist_image = obs['wrist_image']
+                cv2.imwrite("/home/weirdlab/ur_bc/image_obs.jpg", image)
+                cv2.imwrite("/home/weirdlab/ur_bc/wrist_image_obs.jpg", wrist_image)
             
     def _constructActionBasedOnEnv(self, obs):
         action = None
