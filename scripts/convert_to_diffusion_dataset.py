@@ -7,4 +7,4 @@ from environments.BimanualUREnv import BimanualUREnv
 from environments.UREnv import UREnv
 
 data_interface = DataInterface(env_type=UREnv)
-data_interface.convertToRobomimicDataset(use_images=False, normalize=True, normalize_type='min_max')
+data_interface.convertToDiffusionDataset(use_images=True, normalize=True, normalize_type='min_max')

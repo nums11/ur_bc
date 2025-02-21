@@ -15,11 +15,11 @@ class ModelEvalInterface:
         self.normalize_types = ['min_max', 'mean_std']
         self.model, _ = policy_from_checkpoint(ckpt_path=model_path)
         self.model.start_episode()
-        # Transformer stuff
-        # Initialize buffers with zeros
-        self.joint_and_gripper_size = 7  # Assuming 6 joint positions + 1 gripper position
-        # self.joint_and_gripper_buffer = np.zeros((self.frame_stack_size, self.joint_and_gripper_size))
+
+        # Frame stack buffers
         self.joint_and_gripper_buffer = None
+        self.image_buffer = None
+        self.wrist_image_buffer = None
 
         # Start the pynput keyboard listener
         self.start_evaluation = False
@@ -36,12 +36,14 @@ class ModelEvalInterface:
         if key.char == '1':
             self.start_evaluation = True
 
-    def evaluate(self, blocking=False, freq=5, normalize=False, normalize_type='min_max', transformer_model=False, frame_stack_size=10):
+    def evaluate(self, blocking=False, is_delta_action=False, freq=5, normalize=False, normalize_type='min_max', transformer_model=False,
+        diffusion_model=False, frame_stack_size=10):
         print("ModelEvalInterface Evaluating blocking:", blocking, "freq:", freq, "normalize:", normalize, "normalize_type:", normalize_type,
-              "transformer_model:", transformer_model, "frame_stack_size:", frame_stack_size)
+              "transformer_model:", transformer_model, "diffusion_model:", diffusion_model, "frame_stack_size:", frame_stack_size)
         self.frame_stack_size = frame_stack_size
-
+        self.is_delta_action = is_delta_action
         assert normalize_type in self.normalize_types, "Invalid normalize type valid types are: " + str(self.normalize_types)
+        assert not (transformer_model and diffusion_model), "Cannot have both transformer and diffusion models"
 
         if blocking:
             assert self.env.action_type == 'joint_urx', "Blocking mode only supported for joint_urx action type"
@@ -68,13 +70,15 @@ class ModelEvalInterface:
         while True:
             if transformer_model:
                 model_obs = self._convertEnvObsToTransformerObs(env_obs, normalize, normalize_type)
+            elif diffusion_model:
+                model_obs = self._convertEnvObsToDiffusionObs(env_obs)
             else:
                 model_obs = self._convertEnvObsToModelObs(env_obs, normalize, normalize_type)
             print("Observed")
             print(model_obs)
 
             predictions = self.model(model_obs)
-            action = self._constructActionBasedOnEnv(env_obs, predictions, normalize)
+            action = self._constructActionBasedOnEnv(env_obs, predictions, normalize, is_delta_action)
             env_obs = self.env.step(action, blocking)
             if not blocking:
                 sleep(freq_sleep)
@@ -137,13 +141,16 @@ class ModelEvalInterface:
 
         if self.env.use_camera:
             image = obs['image']
+            wrist_image = obs['wrist_image']
             # Change image shape to have channels first
             image = np.transpose(image, (2, 0, 1))
+            wrist_image = np.transpose(wrist_image, (2, 0, 1))
             model_obs['images'] = image
+            model_obs['wrist_images'] = wrist_image
             
         return model_obs
     
-    def _constructActionBasedOnEnv(self, env_obs, predictions, unnormalize):
+    def _constructActionBasedOnEnv(self, env_obs, predictions, unnormalize, is_delta_action):
         action = None
         if type(self.env) == BimanualUREnv:
             left_arm_delta = predictions[:6]
@@ -180,7 +187,11 @@ class ModelEvalInterface:
             print("arm_delta", arm_delta)
             print("gripper", gripper)
 
-            arm_j = env_obs['arm_j'] + arm_delta
+            if is_delta_action:
+                arm_j = env_obs['arm_j'] + arm_delta
+            else:
+                arm_j = arm_delta
+
             action = {
                 'arm_j': arm_j,
                 'gripper': self._convertGripperToBinary(gripper),
@@ -203,7 +214,7 @@ class ModelEvalInterface:
         joint_and_gripper = np.concatenate((arm_j, obs_gripper))
 
         if self.joint_and_gripper_buffer is None:
-            self._initialize_buffer(joint_and_gripper)
+            self.joint_and_gripper_buffer = self._initialize_buffer(joint_and_gripper)
 
         # Update buffers
         self.joint_and_gripper_buffer = np.roll(self.joint_and_gripper_buffer, -1, axis=0)
@@ -214,8 +225,41 @@ class ModelEvalInterface:
         }
 
         return model_obs
+
+    def _convertEnvObsToDiffusionObs(self, obs):
+        # Concatenate arm_j and gripper
+        arm_j = obs['arm_j']
+        obs_gripper = np.expand_dims(obs['gripper'], axis=0)
+        joint_and_gripper = np.concatenate((arm_j, obs_gripper))
+
+        # Transpose images to have channels first
+        image = np.transpose(obs['image'], (2, 0, 1))
+        wrist_image = np.transpose(obs['wrist_image'], (2, 0, 1))
+
+        # Initialize buffers if they are not initialized
+        if self.joint_and_gripper_buffer is None:
+            self.joint_and_gripper_buffer = self._initialize_buffer(joint_and_gripper)
+        if self.image_buffer is None:
+            self.image_buffer = self._initialize_buffer(image)
+        if self.wrist_image_buffer is None:
+            self.wrist_image_buffer = self._initialize_buffer(wrist_image)
+
+        # Update buffers
+        self.joint_and_gripper_buffer = np.roll(self.joint_and_gripper_buffer, -1, axis=0)
+        self.joint_and_gripper_buffer[-1, :] = joint_and_gripper
+        self.image_buffer = np.roll(self.image_buffer, -1, axis=0)
+        self.image_buffer[-1, :, :, :] = image
+        self.wrist_image_buffer = np.roll(self.wrist_image_buffer, -1, axis=0)
+        self.wrist_image_buffer[-1, :, :, :] = wrist_image
+
+        # Create model observation
+        model_obs = {}
+        model_obs['joint_and_gripper'] = self.joint_and_gripper_buffer
+        model_obs['images'] = self.image_buffer
+        model_obs['wrist_images'] = self.wrist_image_buffer
+        return model_obs
     
     def _initialize_buffer(self, initial_frame):
         # Initialize the buffer with the initial frame duplicated
         print("Initializing buffer")
-        self.joint_and_gripper_buffer = np.array([initial_frame] * self.frame_stack_size)
+        return np.array([initial_frame] * self.frame_stack_size)
