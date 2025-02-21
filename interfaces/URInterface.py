@@ -17,7 +17,7 @@ class URInterface:
         self.robotiq_gripper_port = robotiq_gripper_port
 
         # Initialize URX connection
-        self.arm = urx.Robot(self.ip)
+        self.arm = urx.Robot(self.ip, use_rt=True)
         print("URInterface: Initialized URX Connection To IP", self.ip)
         
         # Initialize Modbus Client
@@ -50,6 +50,9 @@ class URInterface:
     """ Get arm pose using urx """
     def getPose(self):
         return np.array(self.arm.get_pose_array())
+
+    def getForce(self):
+        return np.array(self.arm.get_force())
     
     def getj(self):
         return np.array(self.arm.getj())
