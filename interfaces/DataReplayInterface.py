@@ -5,32 +5,41 @@ from environments.BimanualUREnv import BimanualUREnv
 from environments.UREnv import UREnv
 from pynput.keyboard import Listener
 from time import sleep
+import h5py
 
 class DataReplayInterface:
     def __init__(self, env):
         self.env = env
         print("Initialized DataReplayInterface")
 
-    def replayTrajectory(self, traj_file_path):
+    def replayTrajectory(self, hdf5_path, traj_idx, replay_frequency_hz=10):
         self.env.reset()
+
+        if self.env.usesJointModbusActions():
+            print("Start ur Program")
+            sleep(10)
+            print("Running")
+            sleep_time = 1 / replay_frequency_hz
         
-        trajectory = dict(np.load(traj_file_path, allow_pickle=True).items())
-        sorted_timesteps = sorted(trajectory.keys(), key=lambda x: int(x))
-        print("DataInterface: Replaying Trajectory of length", len(sorted_timesteps))
+        with h5py.File(hdf5_path, 'r') as f:
+            traj_group = f['data'][f'traj_{traj_idx}']
+            num_samples = traj_group.attrs['num_samples']
+            print("DataInterface: Replaying Trajectory of length", num_samples)
 
-        print(len(sorted_timesteps))
-        sorted_timesteps = sorted_timesteps[200:]
-        for t in sorted_timesteps:
-            print("Timestep", t)
-            obs = trajectory[str(t)][0]
-            action = self._constructActionBasedOnEnv(obs)
-            self.env.step(action)
+            for t in range(num_samples):
+                print("Timestep", t)
+                obs = {key: traj_group[key][t] for key in traj_group.keys()}
+                action = self._constructActionBasedOnEnv(obs)
+                self.env.step(action)
 
-            if 'image' in obs:
-                image = obs['image']
-                wrist_image = obs['wrist_image']
-                cv2.imwrite("/home/weirdlab/ur_bc/image_obs.jpg", image)
-                cv2.imwrite("/home/weirdlab/ur_bc/wrist_image_obs.jpg", wrist_image)
+                if 'image' in obs:
+                    image = obs['image']
+                    wrist_image = obs['wrist_image']
+                    cv2.imwrite("/home/weirdlab/ur_bc/image_obs.jpg", image)
+                    cv2.imwrite("/home/weirdlab/ur_bc/wrist_image_obs.jpg", wrist_image)
+
+                if self.env.usesJointModbusActions():
+                    sleep(sleep_time)
             
     def _constructActionBasedOnEnv(self, obs):
         action = None

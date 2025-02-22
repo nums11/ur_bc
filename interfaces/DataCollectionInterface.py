@@ -1,3 +1,4 @@
+import h5py
 from pynput.keyboard import Listener
 from time import sleep
 from environments.BimanualUREnv import BimanualUREnv
@@ -8,20 +9,35 @@ import numpy as np
 class DataCollectionInterface:
     def __init__(self, teleop_interface):
         self.teleop_interface = teleop_interface
-        # Start the pynput keyboard listener
-        self.keyboard_listener = Listener(
-            on_release=self._on_release
-        )
+        self.data_base_dir = '/home/weirdlab/ur_bc/data/'
+        self.hdf5_path = os.path.join(self.data_base_dir, 'raw_demonstrations.h5')
+        
+        # Create HDF5 file if it doesn't exist
+        if not os.path.exists(self.hdf5_path):
+            with h5py.File(self.hdf5_path, 'w') as f:
+                data_group = f.create_group('data')
+                data_group.attrs['total_trajectories'] = 0
+                data_group.attrs['total_samples'] = 0
 
+        # Start the pynput keyboard listener
+        self.keyboard_listener = Listener(on_release=self._on_release)
         print("Initialized DataInterface")
 
     def startDataCollection(self, collection_freq_hz=30, remove_zero_actions=False):
         print("DataInterface collection frequency:", collection_freq_hz, "hz")
         self.keyboard_listener.start()
-        self.teleop_interface.start()
-        # wait for teleop to start
-        while self.teleop_interface.resetting:
-            continue
+        
+        # Special handling for joint_modbus mode
+        if (type(self.teleop_interface.env) == UREnv and 
+            self.teleop_interface.env.usesJointModbusActions()):
+            input("\nIMPORTANT: Please make sure the Modbus program is running on the robot.\nPress Enter when ready...")
+            # Start in non-blocking mode
+            self.teleop_interface.start(blocking=False)
+        else:
+            # Original blocking behavior for other modes
+            self.teleop_interface.start()
+            while self.teleop_interface.resetting:
+                continue
 
         self.collecting = False
         self.discard = False
@@ -117,14 +133,30 @@ class DataCollectionInterface:
                         current_obs[0]['gripper'] == 0 and next_obs[0]['gripper'] == 0)
     
     def _saveTrajectory(self, trajectory, remove_zero_actions):
-        filename = self._getDatasetFilename()
         if remove_zero_actions:
             print("DataInterface: Removing Zero actions before saving trajectory")
             trajectory, num_zero_actions = self._removeZeroActions(trajectory)
             print("DataInterface: Removed", num_zero_actions, "actions from trajectory")
-        print("DataInterface: Saving trajectory to path", filename)
-        np.savez(filename, **trajectory)
-        print("\nDataInterface: Finished saving trajectory \n")
+
+        with h5py.File(self.hdf5_path, 'a') as f:
+            data_group = f['data']
+            traj_idx = data_group.attrs['total_trajectories']
+            
+            # Create new trajectory group
+            traj_group = data_group.create_group(f'traj_{traj_idx}')
+            traj_group.attrs['num_samples'] = len(trajectory)
+            
+            # Initialize datasets for each observation key
+            first_obs = trajectory['0'][0]  # Get keys from first observation
+            for key in first_obs.keys():
+                data = np.array([trajectory[str(t)][0][key] for t in range(len(trajectory))])
+                traj_group.create_dataset(key, data=data)
+            
+            # Update metadata
+            data_group.attrs['total_trajectories'] = traj_idx + 1
+            data_group.attrs['total_samples'] += len(trajectory)
+            
+        print(f"\nDataInterface: Saved trajectory {traj_idx} to {self.hdf5_path}\n")
 
 
 
