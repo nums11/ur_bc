@@ -30,9 +30,8 @@ class DataCollectionInterface:
         # Special handling for joint_modbus mode
         if (type(self.teleop_interface.env) == UREnv and 
             self.teleop_interface.env.usesJointModbusActions()):
-            input("\nIMPORTANT: Please make sure the Modbus program is running on the robot.\nPress Enter when ready...")
             # Start in non-blocking mode
-            self.teleop_interface.start(blocking=False)
+            self.teleop_interface.start()
         else:
             # Original blocking behavior for other modes
             self.teleop_interface.start()
