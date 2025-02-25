@@ -35,6 +35,8 @@ class URInterface:
         else:
             self.robotiq_gripper = Robotiq2f85Interface()
 
+        self.previous_values = None  # Initialize previous_values to None
+
     """ Send a movej command using urx """
     def movej(self, joint_positions, blocking=False):
         self.arm.movej(joint_positions, vel=0.5, wait=blocking)
@@ -71,6 +73,45 @@ class URInterface:
             builder.add_16bit_int(int(values[i]))
             payload = builder.to_registers()
             self.modbus_client.write_register(128 + i, payload[0])
+
+    # Interpolation is not working, so we are not using it
+    # def sendModbusValues(self, values):
+    #     # Values will be divided by 100 in URScript
+    #     values = np.array(values) * 100
+
+    #     # Initialize previous_values if it's the first call
+    #     if self.previous_values is None:
+    #         self.previous_values = values
+
+    #     # Interpolation setup
+    #     original_freq = 50  # Original frequency in Hz
+    #     target_freq = 125  # Target frequency in Hz
+    #     # interpolation_steps = int(target_freq / original_freq)
+    #     interpolation_steps = 100
+
+    #     # Perform linear interpolation for each value
+    #     # Create an array of steps from 0 to interpolation_steps-1
+    #     steps = np.arange(interpolation_steps)[:, None]
+        
+    #     # Use broadcasting to create the interpolation for all values at once
+    #     interpolated_values = self.previous_values + (values - self.previous_values) * steps / (interpolation_steps - 1)
+
+    #     # print("previous_values", self.previous_values, "values", values, "interpolation_steps", interpolation_steps, "interpolated_values", interpolated_values)
+    #     builder = BinaryPayloadBuilder(byteorder=Endian.BIG, wordorder=Endian.BIG)
+    #     print("About to send interpolated values")
+    #     for interpolated_value in interpolated_values:
+    #         print("Sending interpolated value", interpolated_value)
+    #         for i in range(6):
+    #             builder.reset()
+    #             builder.add_16bit_int(int(interpolated_value[i]))
+    #             payload = builder.to_registers()
+    #             self.modbus_client.write_register(128 + i, payload[0])
+    #         # sleep(1 / target_freq)  # Sleep to maintain the target frequency
+
+    #     # # Update previous_values
+    #     self.previous_values = values
+    #     print()
+
 
     """ Moves gripper to position 0 (open) or 200 (closed) """
     def moveRobotiqGripper(self, close=True):

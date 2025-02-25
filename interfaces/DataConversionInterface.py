@@ -5,11 +5,11 @@ import json
 from environments.BimanualUREnv import BimanualUREnv
 from environments.UREnv import UREnv
 
-class DataInterface:
+class DataConversionInterface:
     def __init__(self, env_type):
         self.env_type = env_type
         self.normalize_types = ['min_max', 'mean_std']
-        print("Initialized DataInterface")
+        print("Initialized DataConversionInterface")
         
     def convertToRobomimicDataset(self, data_dir='/home/weirdlab/ur_bc/data/',
                                   hdf5_path='/home/weirdlab/ur_bc/robomimic_dataset.hdf5',
@@ -17,7 +17,7 @@ class DataInterface:
                                   normalize=False,
                                   normalize_type='min_max'):
         assert normalize_type in self.normalize_types, "Invalid normalize type valid types are: " + str(self.normalize_types)
-        print("DataInterface Converting to Robomimic Dataset: use_images:", use_images, "normalize:", normalize, "normalize_type:", normalize_type)
+        print("DataConversionInterface Converting to Robomimic Dataset: use_images:", use_images, "normalize:", normalize, "normalize_type:", normalize_type)
         if self.env_type == BimanualUREnv:
             processed_trajectories, num_samples = self._processTrajectoriesBimanual(data_dir, use_images, normalize)
             self._createBimanualHdf5Dataset(processed_trajectories, hdf5_path, use_images, num_samples)
@@ -31,7 +31,7 @@ class DataInterface:
                                   normalize=False,
                                   normalize_type='mean_std'):
         assert normalize_type in self.normalize_types, "Invalid normalize type valid types are: " + str(self.normalize_types)
-        print("DataInterface Converting to Diffusion Dataset: use_images:", use_images, "normalize:", normalize, "normalize_type:", normalize_type)
+        print("DataConversionInterface Converting to Diffusion Dataset: use_images:", use_images, "normalize:", normalize, "normalize_type:", normalize_type)
         if self.env_type == BimanualUREnv:
             # processed_trajectories, num_samples = self._processTrajectoriesBimanual(data_dir, use_images, normalize)
             # self._createBimanualHdf5Dataset(processed_trajectories, hdf5_path, use_images, num_samples)

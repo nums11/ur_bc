@@ -12,7 +12,7 @@ class DataReplayInterface:
         self.env = env
         print("Initialized DataReplayInterface")
 
-    def replayTrajectory(self, hdf5_path, traj_idx, replay_frequency_hz=10):
+    def replayTrajectory(self, hdf5_path, traj_idx, replay_frequency_hz=30):
         self.env.reset()
 
         if self.env.usesJointModbusActions():

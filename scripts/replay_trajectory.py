@@ -7,8 +7,8 @@ from environments.BimanualUREnv import BimanualUREnv
 from environments.UREnv import UREnv
 
 env = UREnv(arm_ip='192.168.1.2', action_type='joint_modbus', has_3f_gripper=False, use_camera=True,
-            start_joint_positions=tuple([0.02001814887733113, -1.6683640884454487, 1.7006658119817653,
-                                         4.69998098138019, -1.660022823816746, -1.5367661252713862]))
+            start_joint_positions=tuple([0.2199889837389461, -1.2699844138325087, 1.309975682655657,
+            4.499995139064124, -1.630002999559844, -1.4599217292097606]))
 
 data_interface = DataReplayInterface(env=env)
-data_interface.replayTrajectory(hdf5_path='/home/weirdlab/ur_bc/data/raw_demonstrations.h5', traj_idx=0)
+data_interface.replayTrajectory(hdf5_path='/home/weirdlab/ur_bc/data/raw_demonstrations.h5', traj_idx=10)
