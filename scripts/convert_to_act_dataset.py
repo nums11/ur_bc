@@ -6,8 +6,8 @@ from tqdm import tqdm
 import argparse
 
 def convert_trajectories(start_idx=0):
-    input_hdf5_path = '/home/weirdlab/ur_bc/data/raw_demonstrations.h5'
-    data_save_dir = '/media/weirdlab/5f6018bf-feb1-4eb4-bdd0-acb9dc9e0422/act_data/'
+    input_hdf5_path = '/home/weirdlab/ur_bc/combined_demonstrations.h5'
+    data_save_dir = '/media/weirdlab/Windows/act_data/'
 
     data_dict = {
         '/observations/qpos': [],

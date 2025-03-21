@@ -13,9 +13,9 @@ from environments.UREnv import UREnv
 #                     left_arm_has_3f_gripper=False, use_camera=False)
 
 
-env = UREnv(arm_ip='192.168.1.2', action_type='ee', has_3f_gripper=False, use_camera=False,
-            start_joint_positions=tuple([-0.10629827887637866, -1.6298863407376247, 1.7127541813994434,
-                                         -1.5893177186083927, -1.5499636211225312, 1.509095389142811]))
+env = UREnv(arm_ip='192.168.2.2', action_type='ee', has_3f_gripper=False, use_camera=False,
+            start_joint_positions=tuple([-4.716078817772303, -1.6518006432668608, -1.942506102770524,
+            -0.23804315079330948, -4.147420500527103, 1.7194674438631463]))
 
 teleop = KeyboardTeleopInterface(env=env)
 teleop.start()

@@ -4,17 +4,13 @@ import threading
 from time import sleep
 
 class UREnv:
-    def __init__(self, action_type='ee', arm_ip='192.168.1.2', limit_workspace=False, start_joint_positions=None,
+    def __init__(self, action_type='ee', arm_ip='192.168.1.2', limit_workspace=False,
+                 use_current_joint_positions=False, start_joint_positions=None,
                  has_3f_gripper=True, robotiq_gripper_port='/dev/ttyUSB0', use_camera=False):
         
         self.limit_workspace = limit_workspace
                 
-        self.start_joint_positions = start_joint_positions
-        if start_joint_positions == None:
-            self.start_joint_positions = tuple([0.04474830963143529, -1.6422924423175793, 1.9634950313912025,
-                                                4.267360912521422, -1.4365121397580038, 2.3399834772053114])
-            
-        self.arm = URInterface(arm_ip, self.start_joint_positions, has_3f_gripper=has_3f_gripper,
+        self.arm = URInterface(arm_ip, use_current_joint_positions, start_joint_positions, has_3f_gripper=has_3f_gripper,
                                     robotiq_gripper_port=robotiq_gripper_port)
         self.arm_pose = self.arm.getPose()
         self.arm_j = self.arm.getj()
@@ -52,7 +48,7 @@ class UREnv:
             if self.usesEEActions():
                 self.arm.resetPositionModbus(self.arm_pose, self.start_arm_pose)
             elif self.usesJointModbusActions():
-                self.arm.resetPositionModbus(self.arm_j, self.start_joint_positions)
+                self.arm.resetPositionModbus(self.arm_j, self.arm.start_joint_positions)
             elif self.usesJointURXActions():
                 self.arm.resetPositionURX()
         # Send current pose or joint values to arms so that it won't jump when the programs are started

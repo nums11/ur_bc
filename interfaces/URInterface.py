@@ -9,15 +9,22 @@ from time import sleep
 import numpy as np
 
 class URInterface:
-    def __init__(self, ip, start_joint_positions, has_3f_gripper=False, robotiq_gripper_port='/dev/ttyUSB0'):
+    def __init__(self, ip, use_current_joint_positions, start_joint_positions, has_3f_gripper=False, robotiq_gripper_port='/dev/ttyUSB0'):
         # Initialize member variables
         self.ip = ip
-        self.start_joint_positions = start_joint_positions
         self.has_3f_gripper = has_3f_gripper
         self.robotiq_gripper_port = robotiq_gripper_port
 
         # Initialize URX connection
         self.arm = urx.Robot(self.ip, use_rt=True)
+        if use_current_joint_positions:
+            self.start_joint_positions = tuple(self.arm.getj())
+        else:
+            self.start_joint_positions = start_joint_positions
+            if start_joint_positions == None:
+                self.start_joint_positions = tuple([0.04474830963143529, -1.6422924423175793, 1.9634950313912025,
+                                                4.267360912521422, -1.4365121397580038, 2.3399834772053114])
+
         print("URInterface: Initialized URX Connection To IP", self.ip)
         
         # Initialize Modbus Client

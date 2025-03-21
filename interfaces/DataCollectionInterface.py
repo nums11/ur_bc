@@ -5,23 +5,35 @@ from environments.BimanualUREnv import BimanualUREnv
 from environments.UREnv import UREnv
 import os
 import numpy as np
+import json
 
 class DataCollectionInterface:
     def __init__(self, teleop_interface):
         self.teleop_interface = teleop_interface
-        self.data_base_dir = '/home/weirdlab/ur_bc/data/'
-        self.hdf5_path = os.path.join(self.data_base_dir, 'raw_demonstrations.h5')
+        # self.data_base_dir = '/home/weirdlab/ur_bc/data/'
+        self.data_base_dir = '/media/weirdlab/e16676a5-3372-430e-84cd-14e37398d508/data/'
+        self.metadata_file = os.path.join(self.data_base_dir, 'trajectory_metadata.json')
         
-        # Create HDF5 file if it doesn't exist
-        if not os.path.exists(self.hdf5_path):
-            with h5py.File(self.hdf5_path, 'w') as f:
-                data_group = f.create_group('data')
-                data_group.attrs['total_trajectories'] = 0
-                data_group.attrs['total_samples'] = 0
+        # Initialize or load metadata
+        if os.path.exists(self.metadata_file):
+            with open(self.metadata_file, 'r') as f:
+                self.metadata = json.load(f)
+        else:
+            self.metadata = {
+                'total_trajectories': 0,
+                'total_samples': 0,
+                'max_trajectory_length': 0
+            }
+            self._save_metadata()
 
         # Start the pynput keyboard listener
         self.keyboard_listener = Listener(on_release=self._on_release)
         print("Initialized DataInterface")
+
+    def _save_metadata(self):
+        """Save metadata to JSON file"""
+        with open(self.metadata_file, 'w') as f:
+            json.dump(self.metadata, f, indent=4)
 
     def startDataCollection(self, collection_freq_hz=30, remove_zero_actions=False):
         print("DataInterface collection frequency:", collection_freq_hz, "hz")
@@ -85,12 +97,9 @@ class DataCollectionInterface:
             if self.collecting:
                 self.save = True
 
-    """ Get the new filename based on the number of existing trajectories """
-    def _getDatasetFilename(self):
-        data_base_dir = '/home/weirdlab/ur_bc/data/'
-        num_trajectories = len(os.listdir(data_base_dir))
-        filename = data_base_dir + 'traj_' + str(num_trajectories) + '.npz'
-        return filename
+    def _getDatasetFilename(self, traj_idx):
+        """Get the filename for a trajectory"""
+        return os.path.join(self.data_base_dir, f'episode_{traj_idx}.hdf5')
     
     """ Remove Zero actions from a trajectory"""
     def _removeZeroActions(self, trajectory):
@@ -137,25 +146,107 @@ class DataCollectionInterface:
             trajectory, num_zero_actions = self._removeZeroActions(trajectory)
             print("DataInterface: Removed", num_zero_actions, "actions from trajectory")
 
-        with h5py.File(self.hdf5_path, 'a') as f:
-            data_group = f['data']
-            traj_idx = data_group.attrs['total_trajectories']
+        # Get trajectory index from metadata
+        traj_idx = self.metadata['total_trajectories']
+        traj_len = len(trajectory)
+        
+        # Update metadata
+        self.metadata['total_trajectories'] += 1
+        self.metadata['total_samples'] += traj_len
+        if traj_len > self.metadata['max_trajectory_length']:
+            self.metadata['max_trajectory_length'] = traj_len
+            print(f"Updated maximum trajectory length: {traj_len}")
+        
+        # Create ACT-format HDF5 file
+        filename = self._getDatasetFilename(traj_idx)
+        
+        # Prepare data for ACT format
+        data_dict = {
+            '/observations/qpos': [],
+            '/observations/images/camera': [],
+            '/observations/images/wrist_camera': [],
+            '/action': [],
+        }
+        
+        # Process each timestep
+        for t in range(traj_len - 1):  # -1 since we need next observation for action
+            # Current observation
+            arm_j = trajectory[str(t)][0]['arm_j']
+            gripper = np.expand_dims(trajectory[str(t)][0]['gripper'], axis=0)
             
-            # Create new trajectory group
-            traj_group = data_group.create_group(f'traj_{traj_idx}')
-            traj_group.attrs['num_samples'] = len(trajectory)
+            # Handle images if available
+            if 'image' in trajectory[str(t)][0]:
+                image = trajectory[str(t)][0]['image']
+                wrist_image = trajectory[str(t)][0]['wrist_image'] if 'wrist_image' in trajectory[str(t)][0] else np.zeros((480, 640, 3), dtype=np.uint8)
+            else:
+                # Placeholder if images are not available
+                image = np.zeros((480, 640, 3), dtype=np.uint8)
+                wrist_image = np.zeros((480, 640, 3), dtype=np.uint8)
+
+            # Next observation (for action)
+            next_arm_j = trajectory[str(t + 1)][0]['arm_j']
+            next_gripper = np.expand_dims(trajectory[str(t + 1)][0]['gripper'], axis=0)
+
+            # Store current observation and action
+            qpos = np.concatenate((arm_j, gripper))
+            action = np.concatenate((next_arm_j, next_gripper))
+            data_dict['/observations/qpos'].append(qpos)
+            data_dict['/observations/images/camera'].append(image)
+            data_dict['/observations/images/wrist_camera'].append(wrist_image)
+            data_dict['/action'].append(action)
+        
+        # Add the last state with a null action (replicating the last action)
+        # This ensures all observations are included
+        t = traj_len - 1
+        arm_j = trajectory[str(t)][0]['arm_j']
+        gripper = np.expand_dims(trajectory[str(t)][0]['gripper'], axis=0)
+        
+        if 'image' in trajectory[str(t)][0]:
+            image = trajectory[str(t)][0]['image']
+            wrist_image = trajectory[str(t)][0]['wrist_image'] if 'wrist_image' in trajectory[str(t)][0] else np.zeros((480, 640, 3), dtype=np.uint8)
+        else:
+            image = np.zeros((480, 640, 3), dtype=np.uint8)
+            wrist_image = np.zeros((480, 640, 3), dtype=np.uint8)
+        
+        qpos = np.concatenate((arm_j, gripper))
+        # Use the same action as the previous timestep or zeros
+        if traj_len > 1:
+            action = data_dict['/action'][-1]  # Copy last action
+        else:
+            action = np.zeros_like(qpos)  # Create zero action
             
-            # Initialize datasets for each observation key
-            first_obs = trajectory['0'][0]  # Get keys from first observation
-            for key in first_obs.keys():
-                data = np.array([trajectory[str(t)][0][key] for t in range(len(trajectory))])
-                traj_group.create_dataset(key, data=data)
+        data_dict['/observations/qpos'].append(qpos)
+        data_dict['/observations/images/camera'].append(image)
+        data_dict['/observations/images/wrist_camera'].append(wrist_image)
+        data_dict['/action'].append(action)
+        
+        # Write to HDF5 file
+        with h5py.File(filename, 'w', rdcc_nbytes=1024 ** 2 * 2) as root:
+            root.attrs['sim'] = False
+            obs = root.create_group('observations')
+            image = obs.create_group('images')
             
-            # Update metadata
-            data_group.attrs['total_trajectories'] = traj_idx + 1
-            data_group.attrs['total_samples'] += len(trajectory)
+            # Get actual data dimensions
+            num_timesteps = len(data_dict['/observations/qpos'])
+            qpos_dim = len(data_dict['/observations/qpos'][0])
             
-        print(f"\nDataInterface: Saved trajectory {traj_idx} to {self.hdf5_path}\n")
+            # Create datasets
+            image.create_dataset('camera', (num_timesteps, 480, 640, 3), dtype='uint8',
+                                chunks=(1, 480, 640, 3))
+            image.create_dataset('wrist_camera', (num_timesteps, 480, 640, 3), dtype='uint8',
+                                chunks=(1, 480, 640, 3))
+            obs.create_dataset('qpos', (num_timesteps, qpos_dim))
+            root.create_dataset('action', (num_timesteps, qpos_dim))
+
+            # Copy data into datasets
+            for name, array in data_dict.items():
+                root[name][...] = array
+        
+        # Save updated metadata
+        self._save_metadata()
+        
+        print(f"\nDataInterface: Saved trajectory {traj_idx} to {filename}")
+        print(f"Trajectory length: {traj_len}, Max trajectory length: {self.metadata['max_trajectory_length']}")
 
 
 
