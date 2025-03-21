@@ -1,12 +1,14 @@
 from interfaces.URInterface import URInterface
 from interfaces.RSCameraInterface import RSCameraInterface
+from interfaces.LogitechCameraInterface import LogitechCameraInterface
 import threading
 from time import sleep
 
 class UREnv:
     def __init__(self, action_type='ee', arm_ip='192.168.1.2', limit_workspace=False,
                  use_current_joint_positions=False, start_joint_positions=None,
-                 has_3f_gripper=True, robotiq_gripper_port='/dev/ttyUSB0', use_camera=False):
+                 has_3f_gripper=True, robotiq_gripper_port='/dev/ttyUSB0', use_camera=False,
+                 use_logitech_camera=False):
         
         self.limit_workspace = limit_workspace
                 
@@ -30,8 +32,11 @@ class UREnv:
 
         self.use_camera = use_camera
         if self.use_camera:
-            self.rs_camera = RSCameraInterface(serial_number='746112060198')
-            self.rs_camera.startCapture()
+            if use_logitech_camera:
+                self.camera = LogitechCameraInterface()
+            else:
+                self.camera = RSCameraInterface(serial_number='746112060198')
+            self.camera.startCapture()
 
         self.reset_counter = 0
 
@@ -122,7 +127,7 @@ class UREnv:
         obs['arm_j'] = self.arm.getj()
         obs['force'] = self.arm.getForce()
         if self.use_camera:
-            obs['image'], obs['wrist_image'] = self.rs_camera.getCurrentImage()
+            obs['image'], obs['wrist_image'] = self.camera.getCurrentImage()
 
         return obs
     

@@ -1,6 +1,6 @@
 from environments.BimanualUREnv import BimanualUREnv
 from environments.UREnv import UREnv
-from gello.agents.gello_agent import GelloAgent
+from gello_software.gello.agents.gello_agent import GelloAgent
 from time import sleep
 import threading
 

@@ -58,7 +58,7 @@ class URInterface:
 
     """ Get arm pose using urx """
     def getPose(self):
-        return np.array(self.arm.get_pose_array())
+        return np.array(self.convertURXPoseToArray(self.arm.get_pose()))
 
     def getForce(self):
         return np.array(self.arm.get_force())
@@ -155,3 +155,9 @@ class URInterface:
         while self.robotiq_gripper.getGripperPosition() > 10:
             continue
         print("URInterface: Finished resetting Robotiq Gripper to start position")
+
+    def convertURXPoseToArray(self, urx_pose):
+        output = np.zeros(6)
+        output[:3] = urx_pose.pos.array_ref
+        output[3:] = urx_pose.orient.log.array_ref
+        return output

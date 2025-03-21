@@ -22,7 +22,7 @@ from environments.UREnv import UREnv
 #                                          -1.6486337716066046, -1.5906957964802926, 1.603541160134426]))
 
 # Kitchen
-env = UREnv(arm_ip='192.168.1.2', action_type='joint_modbus', has_3f_gripper=False, use_camera=True,
+env = UREnv(arm_ip='192.168.1.2', action_type='joint_modbus', has_3f_gripper=False, use_camera=True, use_logitech_camera=True,
             start_joint_positions=tuple([-0.10184682002801448, -1.8316009921757344, 2.2237440184163777,
                 -1.9278720721999862, -1.5840280733482741, 0.04111786366790808]))
 
