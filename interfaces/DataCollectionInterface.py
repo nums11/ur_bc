@@ -239,7 +239,93 @@ class DataCollectionInterface:
 
             # Copy data into datasets
             for name, array in data_dict.items():
-                root[name][...] = array
+                try:
+                    # Debug information to identify problematic arrays
+                    print(f"Debug: Saving {name} with shape: ", end="")
+                    if isinstance(array, list):
+                        if len(array) > 0:
+                            # Check if all elements have the same shape
+                            first_shape = None
+                            irregular_indices = []
+                            irregular_shapes = []
+                            
+                            for i, item in enumerate(array):
+                                if hasattr(item, 'shape'):
+                                    if first_shape is None:
+                                        first_shape = item.shape
+                                    elif item.shape != first_shape:
+                                        irregular_indices.append(i)
+                                        irregular_shapes.append(item.shape)
+                                        if len(irregular_indices) <= 5:  # Limit to first 5 irregular shapes
+                                            print(f"\nWARNING: Item at index {i} has irregular shape {item.shape} (expected {first_shape})")
+                            
+                            if irregular_indices:
+                                print(f"List of length {len(array)} with {len(irregular_indices)} irregular items.")
+                                print(f"First few irregular indices: {irregular_indices[:5]}")
+                                print(f"Corresponding shapes: {irregular_shapes[:5]}")
+                                print(f"Expected shape: {first_shape}")
+                            else:
+                                print(f"List of length {len(array)} with consistent shape {first_shape}")
+                        else:
+                            print("Empty list")
+                    elif hasattr(array, 'shape'):
+                        print(f"Array with shape {array.shape}")
+                    else:
+                        print(f"Unknown data type: {type(array)}")
+                    
+                    # Original save operation
+                    root[name][...] = array
+                except Exception as e:
+                    print(f"\n*** ERROR saving {name} ***")
+                    print(f"Type: {type(array)}")
+                    if isinstance(array, list):
+                        print(f"List length: {len(array)}")
+                        
+                        if len(array) > 0:
+                            print(f"First item type: {type(array[0])}")
+                            if hasattr(array[0], 'shape'):
+                                print(f"First item shape: {array[0].shape}")
+                            
+                            print("Checking list items for consistency...")
+                            unique_shapes = {}
+                            for i, item in enumerate(array):
+                                if hasattr(item, 'shape'):
+                                    shape_key = str(item.shape)
+                                    if shape_key not in unique_shapes:
+                                        unique_shapes[shape_key] = []
+                                    unique_shapes[shape_key].append(i)
+                            
+                            print(f"Found {len(unique_shapes)} different shapes in the list")
+                            for shape, indices in unique_shapes.items():
+                                print(f"  - Shape {shape}: {len(indices)} items. Sample indices: {indices[:3]}")
+                        
+                        print(f"Error details: {str(e)}")
+                        
+                        # If this is an image array, check for None or invalid entries
+                        if name.endswith('/camera') or name.endswith('/wrist_camera'):
+                            null_count = 0
+                            invalid_count = 0
+                            
+                            for i, img in enumerate(array):
+                                if img is None:
+                                    null_count += 1
+                                    if null_count <= 3:  # Limit output to first 3 Nones
+                                        print(f"  - None found at index {i}")
+                                elif not isinstance(img, np.ndarray):
+                                    invalid_count += 1
+                                    if invalid_count <= 3:  # Limit output to first 3 invalid frames
+                                        print(f"  - Non-ndarray at index {i}: {type(img)}")
+                                elif len(img.shape) != 3 or img.shape[0] != 480 or img.shape[1] != 640 or img.shape[2] != 3:
+                                    invalid_count += 1
+                                    if invalid_count <= 3:  # Limit output to first 3 invalid frames
+                                        print(f"  - Invalid shape at index {i}: {img.shape}")
+                            
+                            if null_count > 0:
+                                print(f"  - Found {null_count} None values in the list")
+                            if invalid_count > 0:
+                                print(f"  - Found {invalid_count} invalid frames in the list")
+                    
+                    raise e
         
         # Save updated metadata
         self._save_metadata()

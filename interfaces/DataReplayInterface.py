@@ -1,9 +1,7 @@
 import numpy as np
-import threading
 import cv2
 from environments.BimanualUREnv import BimanualUREnv
 from environments.UREnv import UREnv
-from pynput.keyboard import Listener
 from time import sleep
 import h5py
 
@@ -12,7 +10,7 @@ class DataReplayInterface:
         self.env = env
         print("Initialized DataReplayInterface")
 
-    def replayTrajectory(self, hdf5_path, traj_idx, replay_frequency_hz=30):
+    def replayTrajectory(self, hdf5_path, replay_frequency_hz=30):
         self.env.reset()
 
         if self.env.usesJointModbusActions():
@@ -22,24 +20,48 @@ class DataReplayInterface:
             sleep_time = 1 / replay_frequency_hz
         
         with h5py.File(hdf5_path, 'r') as f:
-            traj_group = f['data'][f'traj_{traj_idx}']
-            num_samples = traj_group.attrs['num_samples']
-            print("DataInterface: Replaying Trajectory of length", num_samples)
-
-            for t in range(num_samples):
-                print("Timestep", t)
-                obs = {key: traj_group[key][t] for key in traj_group.keys()}
+            # Get number of timesteps
+            num_samples = f['observations/qpos'].shape[0]
+            print(f"DataInterface: Replaying Trajectory, length {num_samples}")
+            
+            for t in range(num_samples - 1):  # -1 since the last action might be a duplicate
+                print(f"Timestep {t}")
+                
+                # Extract qpos (joint positions and gripper)
+                qpos = f['observations/qpos'][t]
+                arm_j = qpos[:-1]  # All except the last element (gripper)
+                gripper = qpos[-1]  # Last element is gripper
+                
+                # Construct observation dict for action construction
+                obs = {
+                    'arm_j': arm_j,
+                    'gripper': gripper
+                }
+                
+                # Get the action
                 action = self._constructActionBasedOnEnv(obs)
+                
+                # Execute the action
                 self.env.step(action)
-
-                if 'image' in obs:
-                    image = obs['image']
-                    wrist_image = obs['wrist_image']
-                    cv2.imwrite("/home/weirdlab/ur_bc/image_obs.jpg", image)
-                    cv2.imwrite("/home/weirdlab/ur_bc/wrist_image_obs.jpg", wrist_image)
-
+                
+                # Display images if available
+                if 'observations/images/camera' in f:
+                    image = f['observations/images/camera'][t]
+                    cv2.imshow('Camera View', image)
+                    
+                    # Display wrist camera if available
+                    if 'observations/images/wrist_camera' in f:
+                        wrist_image = f['observations/images/wrist_camera'][t]
+                        cv2.imshow('Wrist Camera View', wrist_image)
+                    
+                    # Short wait to display images
+                    cv2.waitKey(1)
+                
                 if self.env.usesJointModbusActions():
                     sleep(sleep_time)
+        
+        # Clean up CV2 windows
+        cv2.destroyAllWindows()
             
     def _constructActionBasedOnEnv(self, obs):
         action = None

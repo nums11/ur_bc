@@ -1,6 +1,6 @@
 import cv2
 import numpy as np
-import threading
+import multiprocessing
 from time import sleep, time
 import traceback
 
@@ -10,115 +10,150 @@ class LogitechCameraInterface:
         self.top_camera_index = 1  # Top camera
         self.wrist_camera_index = 3  # Wrist camera
         
-        # Thread safety - locks to protect shared resources
-        self.img1_lock = threading.Lock()
-        self.img2_lock = threading.Lock()
+        # Queues for inter-process communication - limited size for real-time performance
+        self.img1_queue = multiprocessing.Queue(maxsize=1)  # Only keep latest frame
+        self.img2_queue = multiprocessing.Queue(maxsize=1)  # Only keep latest frame
         
-        # Image storage
-        self.img1 = None
-        self.img2 = None
-        
-        # Thread control
-        self.running = False
-        self.capture_thread1 = None
-        self.capture_thread2 = None
+        # Process control
+        self.running = multiprocessing.Value('b', False)
+        self.capture_process1 = None
+        self.capture_process2 = None
         
         # Camera state
-        self.camera1_connected = False
-        self.camera2_connected = False
-        self.camera1_error = None
-        self.camera2_error = None
+        self.camera1_connected = multiprocessing.Value('b', False)
+        self.camera2_connected = multiprocessing.Value('b', False)
+        self.camera1_error = multiprocessing.Value('b', False)
+        self.camera2_error = multiprocessing.Value('b', False)
         
-        # Heartbeat tracking to detect frozen threads
-        self.camera1_last_heartbeat = 0
-        self.camera2_last_heartbeat = 0
-        self.heartbeat_thread = None
+        # Frame rate control
+        self.capture_interval = 0.02  # 50Hz capture rate
+        self.display_interval = 0.033  # 30Hz display rate - increased for smoother display
+        
+        # Queue operation timeout (seconds)
+        self.queue_timeout = 0.1  # 100ms timeout for queue operations
+        
+        # Display control
+        self.last_display_time = time()
+        
+        # Last valid frames storage
+        self.last_valid_img1 = np.zeros((480, 640, 3), dtype=np.uint8)  # Last valid top camera frame
+        self.last_valid_img2 = np.zeros((480, 640, 3), dtype=np.uint8)  # Last valid wrist camera frame
         
         print("LogitechCameraInterface: Initialized Logitech Camera Interface")
     
     def startCapture(self):
-        """Start both camera capture threads"""
-        self.running = True
+        """Start both camera capture processes"""
+        self.running.value = True
         
-        # Start individual camera threads
-        self.capture_thread1 = threading.Thread(
+        # Start individual camera processes
+        self.capture_process1 = multiprocessing.Process(
             target=self._captureLoopCamera1, 
-            name="Camera1_Thread"
+            name="Camera1_Process"
         )
-        self.capture_thread2 = threading.Thread(
+        self.capture_process2 = multiprocessing.Process(
             target=self._captureLoopCamera2,
-            name="Camera2_Thread"
+            name="Camera2_Process"
         )
         
-        # Set as daemon threads so they automatically terminate when main program exits
-        self.capture_thread1.daemon = True
-        self.capture_thread2.daemon = True
+        # Start camera processes
+        self.capture_process1.start()
+        self.capture_process2.start()
         
-        # Start camera threads
-        self.capture_thread1.start()
-        self.capture_thread2.start()
+        print("LogitechCameraInterface: Started camera capture processes")
+
+    def _should_update_display(self):
+        """Check if we should update the display based on display interval"""
+        current_time = time()
+        if current_time - self.last_display_time >= self.display_interval:
+            self.last_display_time = current_time
+            return True
+        return False
+    
+    def _is_valid_frame(self, frame):
+        """Check if a frame is valid and usable"""
+        if frame is None:
+            return False
+        if not isinstance(frame, np.ndarray):
+            print(f"Invalid frame: Not a numpy array, got {type(frame)}")
+            return False
+        if frame.size == 0:
+            print(f"Invalid frame: Empty array with size 0")
+            return False
+        if frame.shape[0] <= 0 or frame.shape[1] <= 0:
+            print(f"Invalid frame: Bad dimensions {frame.shape}")
+            return False
+        if len(frame.shape) != 3:
+            print(f"Invalid frame: Not a color image, shape is {frame.shape}")
+            return False
+        if frame.shape[0] != 480 or frame.shape[1] != 640 or frame.shape[2] != 3:
+            print(f"Warning: Unexpected frame dimensions {frame.shape}, expected (480, 640, 3)")
+            # Don't return False here, as we might be able to work with different dimensions
         
-        # Start heartbeat monitoring
-        self.heartbeat_thread = threading.Thread(
-            target=self._monitor_heartbeats,
-            name="Heartbeat_Monitor"
-        )
-        self.heartbeat_thread.daemon = True
-        self.heartbeat_thread.start()
-        
-        print("LogitechCameraInterface: Started camera capture threads")
+        return True
 
     def _captureLoopCamera1(self):
-        """Thread function for Camera 1 (Top)"""
-        print(f"Starting Camera 1 (Top) thread with index: {self.top_camera_index}")
+        """Process function for Camera 1 (Top)"""
+        print(f"Starting Camera 1 (Top) process with index: {self.top_camera_index}")
+        cap = None
         try:
             # Initialize camera
             cap = cv2.VideoCapture(self.top_camera_index)
             if not cap.isOpened():
                 raise Exception(f"Could not open camera with index {self.top_camera_index}")
             
-            # Set resolution
+            # Set resolution - keeping the same resolution as before
             cap.set(cv2.CAP_PROP_FRAME_WIDTH, 640)
             cap.set(cv2.CAP_PROP_FRAME_HEIGHT, 480)
             
-            self.camera1_connected = True
+            self.camera1_connected.value = True
             print(f"Camera 1 (Top) successfully connected")
             
             # Main capture loop
-            while self.running:
+            while self.running.value:
                 try:
-                    # Update heartbeat
-                    self.camera1_last_heartbeat = time()
-                    
                     # Capture frame
                     ret, frame = cap.read()
                     
-                    if not ret:
-                        print("Camera 1 (Top): Failed to grab frame")
-                        sleep(0.01)
+                    if not ret or not self._is_valid_frame(frame):
+                        print("Camera 1 (Top): Failed to grab valid frame")
+                        sleep(self.capture_interval)
                         continue
                     
-                    # Process the frame
-                    with self.img1_lock:
-                        self.img1 = frame.copy()
+                    # Store this valid frame as the last known good frame
+                    # Need to use a manager for sharing this between processes
+                    # For now, update the queue which will be used by getCurrentImage
                     
-                    # Display image (optional - can be disabled)
-                    cv2.imshow('Top camera', self.img1)
-                    cv2.waitKey(1)
+                    # Clear queue before putting new frame to ensure real-time updates
+                    while not self.img1_queue.empty():
+                        try:
+                            self.img1_queue.get(block=False)  # Clear old frames
+                        except:
+                            break
                     
-                    # Small sleep to prevent thread from hogging CPU
-                    sleep(0.01)
+                    # Put frame in queue with timeout
+                    try:
+                        self.img1_queue.put(frame, block=True, timeout=self.queue_timeout)
+                    except:
+                        print("Camera 1 (Top): Queue full, frame dropped")
+                    
+                    # Update display if interval has passed
+                    if self._should_update_display():
+                        cv2.imshow('Top camera', frame)
+                        cv2.waitKey(1)
+                    
+                    # Sleep to control frame rate
+                    sleep(self.capture_interval)
                     
                 except Exception as e:
-                    self.camera1_error = f"Camera 1 (Top) error: {str(e)}"
-                    print(self.camera1_error)
+                    self.camera1_error.value = True
+                    print(f"Camera 1 (Top) error: {str(e)}")
                     traceback.print_exc()
                     sleep(0.5)  # Pause before retry
                 
         except Exception as e:
-            self.camera1_connected = False
-            self.camera1_error = f"Camera 1 (Top) failed to start: {str(e)}"
-            print(self.camera1_error)
+            self.camera1_connected.value = False
+            self.camera1_error.value = True
+            print(f"Camera 1 (Top) failed to start: {str(e)}")
             traceback.print_exc()
             
         finally:
@@ -126,62 +161,74 @@ class LogitechCameraInterface:
             try:
                 if cap is not None:
                     cap.release()
-                self.camera1_connected = False
+                self.camera1_connected.value = False
                 print("Camera 1 (Top) released")
             except Exception as e:
                 print(f"Error stopping Camera 1 (Top): {str(e)}")
 
     def _captureLoopCamera2(self):
-        """Thread function for Camera 2 (Wrist)"""
-        print(f"Starting Camera 2 (Wrist) thread with index: {self.wrist_camera_index}")
+        """Process function for Camera 2 (Wrist)"""
+        print(f"Starting Camera 2 (Wrist) process with index: {self.wrist_camera_index}")
+        cap = None
         try:
             # Initialize camera
             cap = cv2.VideoCapture(self.wrist_camera_index)
             if not cap.isOpened():
                 raise Exception(f"Could not open camera with index {self.wrist_camera_index}")
             
-            # Set resolution
+            # Set resolution - keeping the same resolution as before
             cap.set(cv2.CAP_PROP_FRAME_WIDTH, 640)
             cap.set(cv2.CAP_PROP_FRAME_HEIGHT, 480)
             
-            self.camera2_connected = True
+            self.camera2_connected.value = True
             print(f"Camera 2 (Wrist) successfully connected")
             
             # Main capture loop
-            while self.running:
+            while self.running.value:
                 try:
-                    # Update heartbeat
-                    self.camera2_last_heartbeat = time()
-                    
                     # Capture frame
                     ret, frame = cap.read()
                     
-                    if not ret:
-                        print("Camera 2 (Wrist): Failed to grab frame")
-                        sleep(0.01)
+                    if not ret or not self._is_valid_frame(frame):
+                        print("Camera 2 (Wrist): Failed to grab valid frame")
+                        sleep(self.capture_interval)
                         continue
                     
-                    # Process the frame
-                    with self.img2_lock:
-                        self.img2 = frame.copy()
+                    # Store this valid frame as the last known good frame
+                    # Need to use a manager for sharing this between processes
+                    # For now, update the queue which will be used by getCurrentImage
                     
-                    # Display image (optional - can be disabled)
-                    cv2.imshow('Wrist camera', self.img2)
-                    cv2.waitKey(1)
+                    # Clear queue before putting new frame to ensure real-time updates
+                    while not self.img2_queue.empty():
+                        try:
+                            self.img2_queue.get(block=False)  # Clear old frames
+                        except:
+                            break
                     
-                    # Small sleep to prevent thread from hogging CPU
-                    sleep(0.01)
+                    # Put frame in queue with timeout
+                    try:
+                        self.img2_queue.put(frame, block=True, timeout=self.queue_timeout)
+                    except:
+                        print("Camera 2 (Wrist): Queue full, frame dropped")
+                    
+                    # Update display if interval has passed
+                    if self._should_update_display():
+                        cv2.imshow('Wrist camera', frame)
+                        cv2.waitKey(1)
+                    
+                    # Sleep to control frame rate
+                    sleep(self.capture_interval)
                     
                 except Exception as e:
-                    self.camera2_error = f"Camera 2 (Wrist) error: {str(e)}"
-                    print(self.camera2_error)
+                    self.camera2_error.value = True
+                    print(f"Camera 2 (Wrist) error: {str(e)}")
                     traceback.print_exc()
                     sleep(0.5)  # Pause before retry
                 
         except Exception as e:
-            self.camera2_connected = False
-            self.camera2_error = f"Camera 2 (Wrist) failed to start: {str(e)}"
-            print(self.camera2_error)
+            self.camera2_connected.value = False
+            self.camera2_error.value = True
+            print(f"Camera 2 (Wrist) failed to start: {str(e)}")
             traceback.print_exc()
             
         finally:
@@ -189,68 +236,106 @@ class LogitechCameraInterface:
             try:
                 if cap is not None:
                     cap.release()
-                self.camera2_connected = False
+                self.camera2_connected.value = False
                 print("Camera 2 (Wrist) released")
             except Exception as e:
                 print(f"Error stopping Camera 2 (Wrist): {str(e)}")
 
-    def _monitor_heartbeats(self):
-        """Thread to monitor camera threads and detect if they freeze"""
-        HEARTBEAT_TIMEOUT = 10  # seconds
-        
-        while self.running:
-            current_time = time()
-            
-            # Check Camera 1 heartbeat
-            if self.camera1_connected and current_time - self.camera1_last_heartbeat > HEARTBEAT_TIMEOUT:
-                print(f"WARNING: Camera 1 (Top) thread may be frozen! Last heartbeat: {self.camera1_last_heartbeat}")
-            
-            # Check Camera 2 heartbeat
-            if self.camera2_connected and current_time - self.camera2_last_heartbeat > HEARTBEAT_TIMEOUT:
-                print(f"WARNING: Camera 2 (Wrist) thread may be frozen! Last heartbeat: {self.camera2_last_heartbeat}")
-            
-            sleep(2)  # Check every 2 seconds
-
     def stopCapture(self):
-        """Properly shut down camera threads and resources"""
+        """Properly shut down camera processes and resources"""
         print("LogitechCameraInterface: Stopping camera capture")
-        self.running = False
+        self.running.value = False
         
-        # Stop camera threads with timeout
-        if self.capture_thread1 and self.capture_thread1.is_alive():
-            print("Waiting for Camera 1 (Top) thread to stop...")
-            self.capture_thread1.join(timeout=3)
-            if self.capture_thread1.is_alive():
-                print("WARNING: Camera 1 (Top) thread did not stop gracefully")
+        # Stop camera processes
+        if self.capture_process1 is not None:
+            self.capture_process1.join(timeout=3)  # Add timeout to avoid hanging
+            if self.capture_process1.is_alive():
+                self.capture_process1.terminate()
+            print("Camera 1 (Top) process stopped")
         
-        if self.capture_thread2 and self.capture_thread2.is_alive():
-            print("Waiting for Camera 2 (Wrist) thread to stop...")
-            self.capture_thread2.join(timeout=3)
-            if self.capture_thread2.is_alive():
-                print("WARNING: Camera 2 (Wrist) thread did not stop gracefully")
+        if self.capture_process2 is not None:
+            self.capture_process2.join(timeout=3)  # Add timeout to avoid hanging
+            if self.capture_process2.is_alive():
+                self.capture_process2.terminate()
+            print("Camera 2 (Wrist) process stopped")
+        
+        # Close all windows
+        cv2.destroyAllWindows()
 
     def getCurrentImage(self):
-        """Get the current images from both cameras"""
+        """Get the current images from both cameras, waiting for next valid frames"""
         img1 = None
         img2 = None
         
-        with self.img1_lock:
-            if self.img1 is not None:
-                img1 = self.img1.copy()
+        # Max time to wait for a valid frame (seconds)
+        max_wait_time = 1.0
+        start_time = time()
         
-        with self.img2_lock:
-            if self.img2 is not None:
-                img2 = self.img2.copy()
+        # Get top camera image - keep trying until we get a valid frame or timeout
+        while img1 is None and (time() - start_time) < max_wait_time:
+            try:
+                # Wait for a new frame to arrive with timeout
+                frame = self.img1_queue.get(block=True, timeout=self.queue_timeout)
+                if self._is_valid_frame(frame):
+                    img1 = frame.copy()
+                    # Store as last valid frame for future fallback
+                    self.last_valid_img1 = img1.copy()
+                else:
+                    print(f"Camera 1 (Top): Retrieved invalid frame, waiting for next frame...")
+                    sleep(0.01)  # Short sleep to prevent CPU spinning
+            except Exception as e:
+                if not str(e).startswith("Empty"):  # Don't log expected empty queue
+                    print(f"Camera 1 (Top) get error: {str(e)}, waiting for next frame...")
+                sleep(0.01)  # Short sleep to prevent CPU spinning
+        
+        # If we still don't have a valid frame after waiting, use last valid frame
+        if img1 is None:
+            print("Camera 1 (Top): Timeout waiting for valid frame, using last good frame")
+            img1 = self.last_valid_img1.copy()
+        
+        # Reset timer for second camera
+        start_time = time()
+        
+        # Get wrist camera image - keep trying until we get a valid frame or timeout
+        while img2 is None and (time() - start_time) < max_wait_time:
+            try:
+                # Wait for a new frame to arrive with timeout
+                frame = self.img2_queue.get(block=True, timeout=self.queue_timeout)
+                if self._is_valid_frame(frame):
+                    img2 = frame.copy()
+                    # Store as last valid frame for future fallback
+                    self.last_valid_img2 = img2.copy()
+                else:
+                    print(f"Camera 2 (Wrist): Retrieved invalid frame, waiting for next frame...")
+                    sleep(0.01)  # Short sleep to prevent CPU spinning
+            except Exception as e:
+                if not str(e).startswith("Empty"):  # Don't log expected empty queue
+                    print(f"Camera 2 (Wrist) get error: {str(e)}, waiting for next frame...")
+                sleep(0.01)  # Short sleep to prevent CPU spinning
+        
+        # If we still don't have a valid frame after waiting, use last valid frame
+        if img2 is None:
+            print("Camera 2 (Wrist): Timeout waiting for valid frame, using last good frame")
+            img2 = self.last_valid_img2.copy()
+        
+        # Final verification that we never return None
+        if not self._is_valid_frame(img1):
+            print("WARNING: Top camera frame still invalid, returning zeros")
+            img1 = np.zeros((480, 640, 3), dtype=np.uint8)
+            
+        if not self._is_valid_frame(img2):
+            print("WARNING: Wrist camera frame still invalid, returning zeros")
+            img2 = np.zeros((480, 640, 3), dtype=np.uint8)
         
         return img1, img2
 
     def getCameraStatus(self):
         """Get the current status of both cameras"""
         return {
-            'camera1_connected': self.camera1_connected,
-            'camera2_connected': self.camera2_connected,
-            'camera1_error': self.camera1_error,
-            'camera2_error': self.camera2_error
+            'camera1_connected': self.camera1_connected.value,
+            'camera2_connected': self.camera2_connected.value,
+            'camera1_error': self.camera1_error.value,
+            'camera2_error': self.camera2_error.value
         }
 
     def __del__(self):
