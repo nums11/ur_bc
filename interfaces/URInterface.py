@@ -161,3 +161,26 @@ class URInterface:
         output[:3] = urx_pose.pos.array_ref
         output[3:] = urx_pose.orient.log.array_ref
         return output
+
+    def close(self):
+        """Safely close all connections"""
+        print("URInterface: Closing connections...")
+        try:
+            if hasattr(self, 'arm') and self.arm is not None:
+                self.arm.close()
+                print("URInterface: URX connection closed")
+        except Exception as e:
+            print(f"URInterface: Error closing URX connection: {e}")
+        
+        try:
+            if hasattr(self, 'modbus_client') and self.modbus_client is not None:
+                self.modbus_client.close()
+                print("URInterface: Modbus connection closed")
+        except Exception as e:
+            print(f"URInterface: Error closing Modbus connection: {e}")
+
+
+    def __del__(self):
+        """Cleanup when the object is deleted"""
+        self.close() 
+        

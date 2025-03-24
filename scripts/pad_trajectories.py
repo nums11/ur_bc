@@ -8,7 +8,7 @@ from tqdm import tqdm
 
 def parse_args():
     parser = argparse.ArgumentParser(description="Pad all trajectory files to the maximum trajectory length")
-    parser.add_argument("--data_dir", default="/media/weirdlab/Windows/real_world_data/",
+    parser.add_argument("--data_dir", default="/home/nums/projects/ur_bc/data/",
                         help="Directory containing the trajectory files and metadata")
     parser.add_argument("--metadata_file", default="trajectory_metadata.json",
                         help="Name of the metadata file within the data directory")

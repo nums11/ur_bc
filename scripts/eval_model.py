@@ -1,7 +1,7 @@
 import sys
 import os
 # Add the root directory of the project to the path
-sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), '..')))c
+sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), '..')))
 from interfaces.ModelEvalInterface import ModelEvalInterface
 from environments.BimanualUREnv import BimanualUREnv
 from environments.UREnv import UREnv

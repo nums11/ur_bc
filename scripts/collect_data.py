@@ -6,31 +6,64 @@ from interfaces.DataCollectionInterface import DataCollectionInterface
 from interfaces.KeyboardTeleopInterface import KeyboardTeleopInterface
 from interfaces.GelloTeleopInterface import GelloTeleopInterface
 from environments.UREnv import UREnv
+import signal
 
-# Peg Insertion
-# env = UREnv(arm_ip='192.168.1.2', action_type='joint_modbus', has_3f_gripper=False, use_camera=True,
-#             start_joint_positions=tuple([0.02001814887733113, -1.6683640884454487, 1.7006658119817653,
-#                                           4.69998098138019, -1.660022823816746, -1.5367661252713862]))
-# Twisting
-# env = UREnv(arm_ip='192.168.2.2', action_type='joint_modbus', has_3f_gripper=False, use_camera=True,
-#             start_joint_positions=tuple([0.2199889837389461, -1.2699844138325087, 1.309975682655657,
-#             4.499995139064124, -1.630002999559844, -1.4599217292097606]))
+def main():
+    # Initialize variables to None so they can be checked in finally block
+    env = None
+    teleop_interface = None
+    data_interface = None
+    
+    try:
+        # Kitchen setup
+        env = UREnv(arm_ip='192.168.1.2', action_type='joint_modbus', has_3f_gripper=False, 
+                    use_camera=True, use_logitech_camera=True,
+                    start_joint_positions=tuple([-0.10184682002801448, -1.8316009921757344, 2.2237440184163777,
+                        -1.9278720721999862, -1.5840280733482741, 0.04111786366790808]))
+        
+        teleop_interface = GelloTeleopInterface(env=env)
+        data_interface = DataCollectionInterface(teleop_interface=teleop_interface)
+        
+        # Start collection (this is blocking)
+        data_interface.startDataCollection(remove_zero_actions=False, collection_freq_hz=50)
+        
+    except KeyboardInterrupt:
+        print("\nKeyboard interrupt received, cleaning up...")
+    except Exception as e:
+        print(f"\nError occurred: {e}")
+        import traceback
+        traceback.print_exc()
+    finally:
+        # Clean up all resources
+        print("Performing cleanup...")
+        
+        # Stop data collection if running
+        if data_interface and hasattr(data_interface, 'keyboard_listener'):
+            data_interface.keyboard_listener.stop()
+            print("Stopped keyboard listener")
+        
+        # Clean up environment
+        if env:
+            # Stop any running threads
+            env.resetting = True  # This should stop any ongoing threads
+            
+            # Close camera if it's running
+            if env.use_camera and hasattr(env, 'camera'):
+                try:
+                    env.camera.stopCapture()
+                    print("Stopped camera capture")
+                except Exception as e:
+                    print(f"Error stopping camera: {e}")
+            
+            # Close robot connection
+            if hasattr(env, 'arm') and hasattr(env.arm, 'close'):
+                try:
+                    env.arm.close()
+                    print("Closed robot arm connection")
+                except Exception as e:
+                    print(f"Error closing arm connection: {e}")
+                    
+        print("Cleanup complete")
 
-
-# env = UREnv(arm_ip='192.168.1.2', action_type='ee', has_3f_gripper=False, use_camera=False,
-#             start_joint_positions=tuple([-0.012119847983496967, -1.2344485025217573, 1.3694299784791504,
-#                                          -1.6486337716066046, -1.5906957964802926, 1.603541160134426]))
-
-# Kitchen
-env = UREnv(arm_ip='192.168.1.2', action_type='joint_modbus', has_3f_gripper=False, use_camera=True, use_logitech_camera=True,
-            start_joint_positions=tuple([-0.10184682002801448, -1.8316009921757344, 2.2237440184163777,
-                -1.9278720721999862, -1.5840280733482741, 0.04111786366790808]))
-
-# teleop_interface = KeyboardTeleopInterface(env=env)
-teleop_interface = GelloTeleopInterface(env=env)
-
-data_interface = DataCollectionInterface(teleop_interface=teleop_interface)
-data_interface.startDataCollection(remove_zero_actions=False, collection_freq_hz=50)
-
-# while True:
-#     pass
+if __name__ == "__main__":
+    main()

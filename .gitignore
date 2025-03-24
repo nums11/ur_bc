@@ -6,3 +6,5 @@ data/*
 *.jpg
 *.png
 *.hdf5
+*.pkl
+*.ckpt
