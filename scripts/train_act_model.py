@@ -25,8 +25,10 @@ def main(args):
     batch_size_val = args['batch_size']
     num_epochs = args['num_epochs']
 
-    dataset_dir = '/home/nums/projects/ur_bc/data'
+    dataset_dir = args['dataset_dir']
     metadata_file = os.path.join(dataset_dir, 'trajectory_metadata.json')
+
+    print(f"Using dataset directory: {dataset_dir}")
     
     # Read metadata to get num_episodes and episode_len from the metadata file
     try:
@@ -203,6 +205,7 @@ def train_bc(train_dataloader, val_dataloader, config):
 if __name__ == '__main__':
     parser = argparse.ArgumentParser()
     parser.add_argument('--ckpt_dir', action='store', type=str, help='ckpt_dir', required=True)
+    parser.add_argument('--dataset_dir', action='store', type=str, help='dataset_dir', default='/home/nums/projects/ur_bc/data')
     parser.add_argument('--batch_size', action='store', type=int, help='batch_size', default=8)
     parser.add_argument('--seed', action='store', type=int, help='seed', default=0)
     parser.add_argument('--num_epochs', action='store', type=int, help='num_epochs', default=2000)

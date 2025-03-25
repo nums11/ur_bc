@@ -6,21 +6,47 @@ from interfaces.GelloTeleopInterface import GelloTeleopInterface
 from environments.BimanualUREnv import BimanualUREnv
 from environments.UREnv import UREnv
 
-# env = BimanualUREnv(left_arm_start_joint_positions=tuple([0.00987077648325779, -1.4858401502543641, 2.187743336493244,
-#                                           3.99746649637112, -1.3675774280080697, 4.683919160036989]),
-#                     right_arm_start_joint_positions=tuple([-0.008423261080850786, -1.414431650807854, -2.2114553494555875,
-#                                             -0.8639508269995134, -4.436137256425033, 3.3184844991744717]),
-#                     left_arm_has_3f_gripper=False, use_camera=False)
+def main():
+    try:
+        env = UREnv(arm_ip='192.168.1.2', action_type='joint_modbus',
+                    has_3f_gripper=False, use_camera=False, use_current_joint_positions=True)
 
-# Vention table joint positions
-# env = UREnv(arm_ip='192.168.1.2', action_type='joint_modbus', has_3f_gripper=False, use_camera=False,
-#             start_joint_positions=tuple([2.22746793574166e-05, -1.5708081003042818, 1.5707789608553613,
-#                                          -1.5708197319078439, -1.5707769600749, -1.792811706113895e-05]))
+        teleop = GelloTeleopInterface(env=env)
+        teleop.start()
+        
+    except KeyboardInterrupt:
+        print("\nKeyboard interrupt received, cleaning up...")
+    except Exception as e:
+        print(f"\nError occurred: {e}")
+        import traceback
+        traceback.print_exc()
+    finally:
+        # Clean up all resources
+        print("Performing cleanup...")
+        
+        # Clean up environment
+        if env:
+            # Stop any running threads
+            env.resetting = True  # This should stop any ongoing threads
+            
+            # Close camera if it's running
+            if env.use_camera and hasattr(env, 'camera'):
+                try:
+                    env.camera.stopCapture()
+                    print("Stopped camera capture")
+                except Exception as e:
+                    print(f"Error stopping camera: {e}")
+            
+            # Close robot connection
+            if hasattr(env, 'arm') and hasattr(env.arm, 'close'):
+                try:
+                    env.arm.close()
+                    print("Closed robot arm connection")
+                except Exception as e:
+                    print(f"Error closing arm connection: {e}")
+                    
+        print("Cleanup complete")
 
-# Kitchen joint positions
-env = UREnv(arm_ip='192.168.1.2', action_type='joint_modbus',
-            has_3f_gripper=False, use_camera=False, use_current_joint_positions=True)
 
-teleop = GelloTeleopInterface(env=env)
-teleop.start()
-
+if __name__ == "__main__":
+    main()
