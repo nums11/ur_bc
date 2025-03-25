@@ -1,7 +1,5 @@
-# Universal Robots Behavior Cloning Stack
+# Universal Robots CB2 Behavior Cloning Stack
 
-# Experiments
+## Setup
 
-## Proprio same start position - same object position
-
-### Keyboard Teleop - 45 demos
+pip install -r requirements.txt
