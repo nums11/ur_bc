@@ -40,14 +40,15 @@ def read_serial_data(ser: serial.Serial) -> None:
             if ser.in_waiting:
                 # Read line and decode
                 line = ser.readline().decode('utf-8').strip()
-                print(f"Received: {line}")
-            time.sleep(1/200)  # Small delay to prevent CPU overuse
+                print(f"Received here: {line}")
+            time.sleep(0.004)  # Small delay to prevent CPU overuse
             
     except KeyboardInterrupt:
         print("\nStopping serial read...")
     except Exception as e:
         print(f"Error reading serial data: {e}")
     finally:
+        print("Closing serial port")
         ser.close()
 
 def main():

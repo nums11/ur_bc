@@ -2,7 +2,7 @@ from pyRobotiqGripper import RobotiqGripper
 
 class Robotiq2f85Interface:
     def __init__(self):
-        self.gripper = RobotiqGripper()
+        self.gripper = RobotiqGripper(portname='/dev/ttyUSB0')
         self.gripper.activate()
         self.gripper.calibrate(0, 40)
         self.gripper_closed = False

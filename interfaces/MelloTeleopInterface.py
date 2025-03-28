@@ -5,6 +5,7 @@ from time import sleep
 import threading
 import json
 import math
+import ast
 
 class MelloTeleopInterface:
     def __init__(self, env, port='/dev/serial/by-id/usb-M5Stack_Technology_Co.__Ltd_M5Stack_UiFlow_2.0_24587ce945900000-if00', baudrate=115200):
@@ -17,6 +18,9 @@ class MelloTeleopInterface:
         self.serial = None
         self.obs = {}
         self._setup_serial()
+        # Initialize previous values
+        self.prev_joints = [0] * 6
+        self.prev_gripper = 0
         print("Initialized MelloTeleopInterface")
 
     def _setup_serial(self):
@@ -50,43 +54,56 @@ class MelloTeleopInterface:
             if self.serial.in_waiting:
                 line = self.serial.readline().decode('utf-8').strip()
                 try:
-                    # Parse the JSON data
-                    data = json.loads(line)
+                    # Parse the Python literal data
+                    data = ast.literal_eval(line)
                     
                     # Get joint positions array
                     joint_positions = data.get('joint_positions:', [0]*7)
                     
                     # Take first 6 values for joints (in degrees) and convert to radians
                     joints_deg = joint_positions[:6]
+                    # Negate joint 2 (index 2)
+                    joints_deg[2] = -1 * joints_deg[2]
                     joints_rad = self._degrees_to_radians(joints_deg)
                     
                     # Get gripper value (last value, between -4096 and 4096)
-                    gripper_value = joint_positions[-1] if len(joint_positions) > 6 else 0
+                    gripper_value = joint_positions[-1] if len(joint_positions) > 6 else self.prev_gripper
                     
-                    return joints_rad, gripper_value
+                    # Update previous joint values if current values are not zeros
+                    if not all(j == 0 for j in joints_rad):
+                        self.prev_joints = joints_rad
+                    # Update previous gripper value
+                    self.prev_gripper = gripper_value
                     
-                except json.JSONDecodeError:
+                    return self.prev_joints, self.prev_gripper
+                    
+                except (ValueError, SyntaxError) as e:
                     print(f"Error parsing serial data: {line}")
-                    return [0]*6, 0
-            return [0]*6, 0
+                    print(f"Parse error: {str(e)}")
+                    return self.prev_joints, self.prev_gripper
+            return self.prev_joints, self.prev_gripper
         except Exception as e:
             print(f"Error reading serial data: {e}")
-            return [0]*6, 0
+            return self.prev_joints, self.prev_gripper
 
     def _teleopThread(self):
         """Main teleop thread that reads serial data and controls robot."""
         self.reset()
+        print("MelloTeleopInterface: Listening to Mello")
         while True:
             if not self.resetting:
                 # Get the servo readings from Mello
                 joints, gripper = self._read_serial_values()
+                # Bug where sometimes Mello doesn't send all 6 joint values
+                if len(joints) < 6:
+                    continue
                 print(f"Joints: {joints}, Gripper: {gripper}")
                 # Construct action
                 action = self._constructActionBasedOnEnv(joints, gripper)
                 
                 # Step the environment
                 self.obs = self.env.step(action)
-                sleep(0.004)  # 250hz
+                sleep(1/100)  # 150hz
 
     def reset(self):
         """Reset the environment."""

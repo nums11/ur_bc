@@ -50,7 +50,7 @@ from time import sleep
 
 from pyRobotiqGripper import RobotiqGripper
 
-gripper = RobotiqGripper()
+gripper = RobotiqGripper(portname='/dev/ttyUSB0')
 
 gripper.activate()
 gripper.calibrate(0, 40)
