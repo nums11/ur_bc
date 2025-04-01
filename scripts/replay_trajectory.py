@@ -15,9 +15,9 @@ def main():
                         help='Path to the HDF5 dataset file')
     parser.add_argument('--ip', type=str, default='192.168.1.2',
                         help='Robot arm IP address')
-    parser.add_argument('--use_camera', default=True,
+    parser.add_argument('--use_camera', default=False,
                         help='Enable camera interface')
-    parser.add_argument('--use_logitech_camera', default=True,
+    parser.add_argument('--use_logitech_camera', default=False,
                         help='Use Logitech camera instead of RealSense')
     parser.add_argument('--freq', type=int, default=30,
                         help='Replay frequency in Hz')
