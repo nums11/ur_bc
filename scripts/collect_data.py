@@ -4,7 +4,8 @@ import os
 sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), '..')))
 from interfaces.DataCollectionInterface import DataCollectionInterface
 from interfaces.KeyboardTeleopInterface import KeyboardTeleopInterface
-from interfaces.GelloTeleopInterface import GelloTeleopInterface
+# from interfaces.GelloTeleopInterface import GelloTeleopInterface
+from interfaces.MelloTeleopInterface import MelloTeleopInterface
 from environments.UREnv import UREnv
 import signal
 
@@ -17,11 +18,11 @@ def main():
     try:
         # Kitchen setup
         env = UREnv(arm_ip='192.168.1.2', action_type='joint_modbus', has_3f_gripper=False, 
-                    use_camera=True, use_logitech_camera=True,
+                    use_camera=True, use_logitech_camera=False,
                     start_joint_positions=tuple([-0.10184682002801448, -1.8316009921757344, 2.2237440184163777,
                         -1.9278720721999862, -1.5840280733482741, 0.04111786366790808]))
         
-        teleop_interface = GelloTeleopInterface(env=env)
+        teleop_interface = MelloTeleopInterface(env=env)
         data_interface = DataCollectionInterface(teleop_interface=teleop_interface)
         
         # Start collection (this is blocking)

@@ -10,7 +10,9 @@ import json
 class DataCollectionInterface:
     def __init__(self, teleop_interface):
         self.teleop_interface = teleop_interface
-        self.data_base_dir = '/home/nums/projects/ur_bc/data'
+        script_dir = os.path.dirname(os.path.abspath(__file__))
+        ur_bc_dir = os.path.dirname(script_dir)
+        self.data_base_dir = os.path.join(ur_bc_dir, 'data')
         self.metadata_file = os.path.join(self.data_base_dir, 'trajectory_metadata.json')
         
         # Initialize or load metadata

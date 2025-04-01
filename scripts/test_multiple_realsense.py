@@ -10,8 +10,8 @@ config_1 = rs.config()
 config_2 = rs.config()
 
 # Enable the first camera
-# D405 123622270802
-config_1.enable_device('123622270802')
+# D455 207322251049
+config_1.enable_device('207322251049')
 config_1.enable_stream(rs.stream.color, 640, 480, rs.format.bgr8, 30)
 
 # Enable the second camera

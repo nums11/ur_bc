@@ -11,6 +11,10 @@ def main():
     # Create a configuration object for the pipeline
     config = rs.config()
 
+    # D455 207322251049
+    # D415 746112060198
+    config.enable_device('746112060198')
+
     # Enable the color stream (RGB)
     config.enable_stream(rs.stream.color, 640, 480, rs.format.bgr8, 30)
 
@@ -30,7 +34,6 @@ def main():
 
             # Convert the color frame to a NumPy array
             color_image = np.asanyarray(color_frame.get_data())
-            color_image = cv2.flip(color_image, 0)
 
             # Display the image
             cv2.imshow('RealSense Camera', color_image)
@@ -47,6 +50,7 @@ def main():
 
     finally:
         # Stop the pipeline and release resources
+        print("Stopping RealSense camera.")
         pipeline.stop()
         cv2.destroyAllWindows()
 
