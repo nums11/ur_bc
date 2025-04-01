@@ -80,6 +80,7 @@ class DataCollectionInterface:
                 print("t", t, "obs", obs)
                 t += 1
                 sleep(collection_sleep)
+            sleep(1)
 
     def _printCollectionMessage(self):
         print("Press '1' to begin data collection, '2' to discard trajectory, '3' to save trajectory")

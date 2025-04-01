@@ -97,7 +97,6 @@ class MelloTeleopInterface:
                 # Bug where sometimes Mello doesn't send all 6 joint values
                 if len(joints) < 6:
                     continue
-                print(f"Joints: {joints}, Gripper: {gripper}")
                 # Construct action
                 action = self._constructActionBasedOnEnv(joints, gripper)
                 
