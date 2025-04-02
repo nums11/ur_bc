@@ -102,7 +102,7 @@ class MelloTeleopInterface:
                 
                 # Step the environment
                 self.obs = self.env.step(action)
-                sleep(1/100)  # 150hz
+                sleep(1/100)
 
     def reset(self):
         """Reset the environment."""

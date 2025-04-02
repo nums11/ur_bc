@@ -8,3 +8,4 @@ data/*
 *.hdf5
 *.pkl
 *.ckpt
+calibration/*

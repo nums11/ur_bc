@@ -13,7 +13,7 @@ def main():
 
     # D455 207322251049
     # D415 746112060198
-    config.enable_device('746112060198')
+    config.enable_device('207322251049')
 
     # Enable the color stream (RGB)
     config.enable_stream(rs.stream.color, 640, 480, rs.format.bgr8, 30)
