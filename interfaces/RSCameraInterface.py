@@ -15,6 +15,10 @@ class RSCameraInterface:
         self.cam1_serial = '207322251049'  # Top camera (D455)
         self.cam2_serial = '746112060198'  # Wrist camera (D415)
         
+        # Camera exposure settings
+        self.cam1_exposure = 200  # Fixed exposure for cam1 (Top D455)
+        self.cam2_exposure = 500  # Fixed exposure for cam2 (Wrist D415)
+        
         # Queues for inter-process communication - limited size for real-time performance
         self.img1_queue = multiprocessing.Queue(maxsize=1)  # Only keep latest frame
         self.img2_queue = multiprocessing.Queue(maxsize=1)  # Only keep latest frame
@@ -104,7 +108,14 @@ class RSCameraInterface:
             config.enable_stream(rs.stream.color, 640, 480, rs.format.bgr8, 30)
             
             # Start the pipeline
-            pipeline.start(config)
+            profile = pipeline.start(config)
+            
+            # Configure fixed exposure for Camera 1
+            sensor = profile.get_device().first_color_sensor()
+            sensor.set_option(rs.option.enable_auto_exposure, 0)  # Disable auto exposure
+            sensor.set_option(rs.option.exposure, self.cam1_exposure)  # Set fixed exposure value
+            print(f"Camera 1 (Top) exposure set to {self.cam1_exposure}")
+            
             self.camera1_connected.value = True
             print(f"Camera 1 (Top) successfully connected")
             
@@ -193,7 +204,14 @@ class RSCameraInterface:
             config.enable_stream(rs.stream.color, 640, 480, rs.format.bgr8, 30)
             
             # Start the pipeline
-            pipeline.start(config)
+            profile = pipeline.start(config)
+            
+            # Configure fixed exposure for Camera 2
+            sensor = profile.get_device().first_color_sensor()
+            sensor.set_option(rs.option.enable_auto_exposure, 0)  # Disable auto exposure
+            sensor.set_option(rs.option.exposure, self.cam2_exposure)  # Set fixed exposure value
+            print(f"Camera 2 (Wrist) exposure set to {self.cam2_exposure}")
+            
             self.camera2_connected.value = True
             print(f"Camera 2 (Wrist) successfully connected")
             
