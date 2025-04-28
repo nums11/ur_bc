@@ -6,6 +6,8 @@ import threading
 import json
 import math
 import ast
+import time  # Add at the top if not already imported
+import numpy as np
 
 class MelloTeleopInterface:
     def __init__(self, env, port='/dev/serial/by-id/usb-M5Stack_Technology_Co.__Ltd_M5Stack_UiFlow_2.0_24587ce945900000-if00', baudrate=115200):
@@ -94,15 +96,24 @@ class MelloTeleopInterface:
             if not self.resetting:
                 # Get the servo readings from Mello
                 joints, gripper = self._read_serial_values()
+                
                 # Bug where sometimes Mello doesn't send all 6 joint values
                 if len(joints) < 6:
                     continue
+
+                # Compute forward kinematics
+                ee_pose = self.forward_kinematics(joints)
+                print(f"EE Pose: {ee_pose}")
+                # import pdb; pdb.set_trace()
+
                 # Construct action
-                action = self._constructActionBasedOnEnv(joints, gripper)
+                # action = self._constructActionBasedOnEnv(joints, gripper)
+                action = self._constructActionBasedOnEnv(ee_pose, gripper)
+
                 
                 # Step the environment
                 self.obs = self.env.step(action)
-                sleep(1/100)
+                sleep(1/200)
 
     def reset(self):
         """Reset the environment."""
@@ -141,4 +152,103 @@ class MelloTeleopInterface:
         """Clean up resources."""
         if self.serial and self.serial.is_open:
             self.serial.close()
-            print("Serial port closed") 
+            print("Serial port closed")
+
+    def forward_kinematics(self, joint_angles):
+        """
+        Compute the forward kinematics for a UR5 CB2 robot.
+        Args:
+            joint_angles: List of 6 joint angles in radians.
+        Returns:
+            A tuple representing the Cartesian position (x, y, z) and orientation (roll, pitch, yaw) of the end effector.
+        """
+        # DH Parameters for UR5
+        dh_params = [
+            (0, 0.089159, math.pi/2),
+            (-0.425, 0, 0),
+            (-0.39225, 0, 0),
+            (0, 0.10915, math.pi/2),
+            (0, 0.09465, -math.pi/2),
+            (0, 0.0823, 0)
+        ]
+
+        # Initialize transformation matrix
+        T = np.eye(4)
+
+        for i, (a, d, alpha) in enumerate(dh_params):
+            theta = joint_angles[i]
+            # Compute transformation matrix for each joint
+            T_i = np.array([
+                [math.cos(theta), -math.sin(theta) * math.cos(alpha), math.sin(theta) * math.sin(alpha), a * math.cos(theta)],
+                [math.sin(theta), math.cos(theta) * math.cos(alpha), -math.cos(theta) * math.sin(alpha), a * math.sin(theta)],
+                [0, math.sin(alpha), math.cos(alpha), d],
+                [0, 0, 0, 1]
+            ])
+            # Multiply the current transformation matrix
+            T = np.dot(T, T_i)
+
+        # Extract the position of the end effector
+        x, y, z = T[0, 3], T[1, 3], T[2, 3]
+
+        # Extract the rotation matrix
+        R = T[:3, :3]
+
+        # Convert rotation matrix to rotation vector (axis-angle) rx, ry, rz
+        trace = np.trace(R)
+        # Clamp trace to avoid numerical errors with arccos
+        trace = max(-1.0, min(3.0, trace))
+        theta = math.acos((trace - 1.0) / 2.0)
+
+        if abs(theta) < 1e-9:  # Threshold for ~0 rotation
+            # Identity rotation, rotation vector is zero
+            rx, ry, rz = 0.0, 0.0, 0.0
+        elif abs(theta - math.pi) < 1e-9: # Threshold for ~180 degree rotation
+            # Rotation by pi radians, singularity in standard formula
+            # We need to find the axis u from R = 2u*u^T - I
+            # ux^2 = (R[0,0]+1)/2, uy^2 = (R[1,1]+1)/2, uz^2 = (R[2,2]+1)/2
+            # Need to determine signs based on off-diagonal elements
+            
+            # Find axis u for theta = pi
+            if R[0, 0] >= R[1, 1] and R[0, 0] >= R[2, 2]:
+                ux = math.sqrt((R[0, 0] + 1) / 2)
+                uy = R[0, 1] / (2 * ux) if abs(ux) > 1e-6 else math.sqrt((R[1, 1] + 1) / 2) * np.sign(R[0,1]) if abs(R[0,1]) > 1e-6 else 0.0
+                uz = R[0, 2] / (2 * ux) if abs(ux) > 1e-6 else math.sqrt((R[2, 2] + 1) / 2) * np.sign(R[0,2]) if abs(R[0,2]) > 1e-6 else 0.0
+
+            elif R[1, 1] >= R[0, 0] and R[1, 1] >= R[2, 2]:
+                uy = math.sqrt((R[1, 1] + 1) / 2)
+                ux = R[0, 1] / (2 * uy) if abs(uy) > 1e-6 else math.sqrt((R[0, 0] + 1) / 2) * np.sign(R[0,1]) if abs(R[0,1]) > 1e-6 else 0.0
+                uz = R[1, 2] / (2 * uy) if abs(uy) > 1e-6 else math.sqrt((R[2, 2] + 1) / 2) * np.sign(R[1,2]) if abs(R[1,2]) > 1e-6 else 0.0
+
+            else: # R[2,2] is largest diagonal
+                uz = math.sqrt((R[2, 2] + 1) / 2)
+                ux = R[0, 2] / (2 * uz) if abs(uz) > 1e-6 else math.sqrt((R[0, 0] + 1) / 2) * np.sign(R[0,2]) if abs(R[0,2]) > 1e-6 else 0.0
+                uy = R[1, 2] / (2 * uz) if abs(uz) > 1e-6 else math.sqrt((R[1, 1] + 1) / 2) * np.sign(R[1,2]) if abs(R[1,2]) > 1e-6 else 0.0
+
+            # Normalize the axis vector in case of slight numerical inaccuracies
+            u_norm = math.sqrt(ux*ux + uy*uy + uz*uz)
+            if u_norm > 1e-6:
+                ux /= u_norm
+                uy /= u_norm
+                uz /= u_norm
+
+            rx, ry, rz = theta * ux, theta * uy, theta * uz
+        else:
+            # General case: 0 < theta < pi
+            # Use the formula r = theta * u = theta / (2 * sin(theta)) * [R(2,1)-R(1,2), R(0,2)-R(2,0), R(1,0)-R(0,1)]
+            # The magnitude of the skew-symmetric vector part is 2 * sin(theta)
+            vx = R[2, 1] - R[1, 2]
+            vy = R[0, 2] - R[2, 0]
+            vz = R[1, 0] - R[0, 1]
+            v_norm = math.sqrt(vx*vx + vy*vy + vz*vz) # This is 2 * sin(theta)
+            
+            # Avoid division by zero if sin(theta) is very small (should be covered by theta checks, but added for safety)
+            if v_norm < 1e-9:
+                 rx, ry, rz = 0.0, 0.0, 0.0 # Should not happen given prior checks
+            else:
+                scale = theta / v_norm
+                rx = vx * scale
+                ry = vy * scale
+                rz = vz * scale
+
+        # Return pose as [x, y, z, rx, ry, rz]
+        return np.array([x, y, z, rx, ry, rz]) 
