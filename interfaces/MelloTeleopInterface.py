@@ -23,6 +23,17 @@ class MelloTeleopInterface:
         # Initialize previous values
         self.prev_joints = [0] * 6
         self.prev_gripper = 0
+        # Admittance parameters
+        self.admittance_gain_linear = 0.0003 # Meters per Newton (adjust as needed)
+        self.admittance_gain_angular = 0.003 # Radians per Newton-meter (adjust as needed)
+        self.current_force_torque = np.zeros(6) # Initialize FT reading storage
+        
+        # Force filtering parameters
+        self.filtered_ft = np.zeros(6)  # Filtered force-torque state
+        self.filter_alpha = 0.8  # Filter strength (0-1, lower = more filtering)
+        self.force_deadband = 60.0  # Newtons (ignore forces below this threshold)
+        self.torque_deadband = 6.0  # Newton-meters (ignore torques below this threshold)
+        
         print("Initialized MelloTeleopInterface")
 
     def _setup_serial(self):
@@ -101,18 +112,71 @@ class MelloTeleopInterface:
                 if len(joints) < 6:
                     continue
 
-                # Compute forward kinematics
-                ee_pose = self.forward_kinematics(joints)
-                print(f"EE Pose: {ee_pose}")
-                # import pdb; pdb.set_trace()
+                # Compute kinematic pose from Mello joints
+                ee_pose_kinematic = self.forward_kinematics(joints)
+                # print(f"Kinematic EE Pose: {ee_pose_kinematic[:3]}") # Optional: Print only position for clarity
 
-                # Construct action
-                # action = self._constructActionBasedOnEnv(joints, gripper)
-                action = self._constructActionBasedOnEnv(ee_pose, gripper)
+                # Get latest force-torque reading (assuming key 'force')
+                # Ensure self.obs is populated and has the key
+                if isinstance(self.obs, dict):
+                    # Get raw force-torque data
+                    raw_ft = self.obs.get('force', np.zeros(6))
+                    
+                    # Apply low-pass filter
+                    self.filtered_ft = self.filter_alpha * raw_ft + (1 - self.filter_alpha) * self.filtered_ft
+                    
+                    # Apply deadband
+                    filtered_deadbanded_ft = np.copy(self.filtered_ft)
+                    # For forces (first 3 elements)
+                    for i in range(3):
+                        if abs(filtered_deadbanded_ft[i]) < self.force_deadband:
+                            filtered_deadbanded_ft[i] = 0.0
+                    # For torques (last 3 elements)
+                    for i in range(3, 6):
+                        if abs(filtered_deadbanded_ft[i]) < self.torque_deadband:
+                            filtered_deadbanded_ft[i] = 0.0
+                    
+                    # Update current_force_torque with filtered and deadbanded values
+                    self.current_force_torque = filtered_deadbanded_ft
+                else:
+                    # Handle cases where obs might not be a dict initially or after reset
+                    self.current_force_torque = np.zeros(6)
+                    self.filtered_ft = np.zeros(6)  # Reset filter state
+                
+                # Calculate admittance adjustment
+                delta_pos = self.admittance_gain_linear * self.current_force_torque[:3]
+                delta_rot = self.admittance_gain_angular * self.current_force_torque[3:]
+                delta_pose = np.concatenate((delta_pos, delta_rot))
 
+                # Calculate commanded pose
+                ee_pose_commanded = ee_pose_kinematic + delta_pose
+
+
+                if ee_pose_commanded[1] > 0.2:
+                    ee_pose_commanded[1] = 0.2
+                elif ee_pose_commanded[1] < -0.3:
+                    ee_pose_commanded[1] = -0.3
+
+                if ee_pose_commanded[2] > 0.4:
+                    ee_pose_commanded[2] = 0.4
+                elif ee_pose_commanded[2] < 0.17:
+                    ee_pose_commanded[2] = 0.17
+
+                print(f"Commanded EE Pose: {ee_pose_commanded}")
+                print(f"Force: {self.current_force_torque}") # Optional: Print force
+                print(f"Delta Pos: {delta_pos}") # Optional: Print delta position
+                
+                # Construct action with commanded Cartesian pose
+                action = self._constructActionBasedOnEnv(ee_pose_commanded, gripper)
                 
                 # Step the environment
                 self.obs = self.env.step(action)
+                
+                # Optional: Update FT reading immediately after step if needed, 
+                # otherwise it's updated at the start of the next loop.
+                # if isinstance(self.obs, dict):
+                #     self.current_force_torque = self.obs.get('ft_reading', np.zeros(6))
+
                 sleep(1/200)
 
     def reset(self):
@@ -120,6 +184,8 @@ class MelloTeleopInterface:
         self.resetting = True
         self.obs = self.env.reset()
         self.resetting = False
+        self.current_force_torque = np.zeros(6) # Reset FT reading
+        self.filtered_ft = np.zeros(6) # Reset filter state
 
     def _constructActionBasedOnEnv(self, joints, gripper):
         """Construct action based on environment type."""
@@ -160,7 +226,8 @@ class MelloTeleopInterface:
         Args:
             joint_angles: List of 6 joint angles in radians.
         Returns:
-            A tuple representing the Cartesian position (x, y, z) and orientation (roll, pitch, yaw) of the end effector.
+            A numpy array representing the Cartesian pose [x, y, z, rx, ry, rz],
+            where (x, y, z) is the position and (rx, ry, rz) is the rotation vector (axis-angle).
         """
         # DH Parameters for UR5
         dh_params = [
