@@ -1,4 +1,4 @@
-# Universal Robots CB2 Behavior Cloning Stack
+# Universal Robots Behavior Cloning Stack
 
 ## Connecting to the arm via ethernet
 
