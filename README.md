@@ -31,7 +31,7 @@
 ![Mello Calibration Image 1](mello_calib_1.jpg)
 ![Mello Calibration Image 1](mello_calib_2.jpg)
 
-    After pressing and holding the red button, you will know calibration is complete as the ZERO indicator on the screen will now be green
+After pressing and holding the red button, you will know calibration is complete as the ZERO indicator on the screen will now be green
 
 ![Mello Zero Indicator](mello_zero.jpg)
 
@@ -57,6 +57,10 @@
 
 ## Camera Calibration
 
+### Testing Realsense Camera
+
+Can check stream for realsense camera (modify id in script) ```python scripts/stream_realsense.py```
+
 ### Calibrate the camera
 
 ```python scripts/pc_calibration.py```
@@ -69,3 +73,18 @@ Matrices for each calibration as well as the final transformation matrix are sav
 
 To view calibration accuracy ```python scripts/visualize_calibration.py```. Blue and green points close to eachother means the predicted values are good and the calibration was successful.
 
+## Data Collection
+
+### Collecting Data
+
+For data collection run ```python scripts/collect_data.py```. Can modify collection frequency or whether or not to use the camera. For Implementation details refer to the ```DataCollectionInterface```.
+
+### Replaying Data
+
+#### Create video from any trajectory
+
+```python scripts/visualize_trajectory.py```
+
+#### Replay Trajectory in the real world
+
+```python scripts/replay_trajectory.py```
